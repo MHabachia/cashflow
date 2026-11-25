@@ -1,0 +1,775 @@
+"use server";
+
+import { db } from "@/lib/db";
+import {
+  connectedBanks,
+  bankAccounts,
+  transactions,
+  categories,
+  type BankAccountType,
+} from "@/lib/db/schema";
+import { requireUser } from "@/lib/session";
+import { logAudit } from "@/lib/audit";
+import { encryptBankToken } from "@/lib/crypto/vault";
+import { POPULAR_BANK_INSTITUTIONS } from "@/lib/bank-institutions";
+import {
+  BANK_SYNC_NOT_CONFIGURED_ERROR,
+  isLiveBankingMode,
+  isMockBankingAllowed,
+} from "@/lib/bank-sync/provider";
+import {
+  syncBankAccountTransactions,
+  syncAllActiveBankAccounts,
+} from "@/lib/bank-sync/sync-engine";
+import { getOrCreateTransferCategory } from "@/lib/transfer-detection";
+import { and, eq, isNull } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import crypto from "node:crypto";
+
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Outside Next.js request context (z. B. in Unit-Tests), ist revalidatePath ein No-Op
+  }
+}
+
+export async function disconnectBankAction(connectedBankId: string) {
+  try {
+    const user = await requireUser();
+    logAudit({ action: "bank.disconnect", userId: user.id, target: connectedBankId });
+
+    // 1. Alle zugehörigen Konten ermitteln (für PSD2 oder manuelle Gruppe)
+    const accounts =
+      connectedBankId === "manual_banks_group"
+        ? db
+            .select({ id: bankAccounts.id })
+            .from(bankAccounts)
+            .where(
+              and(
+                isNull(bankAccounts.connectedBankId),
+                eq(bankAccounts.userId, user.id)
+              )
+            )
+            .all()
+        : db
+            .select({ id: bankAccounts.id })
+            .from(bankAccounts)
+            .where(
+              and(
+                eq(bankAccounts.connectedBankId, connectedBankId),
+                eq(bankAccounts.userId, user.id)
+              )
+            )
+            .all();
+
+    const accountIds = accounts.map((a) => a.id);
+
+    // 2. Transaktionen sicher entkoppeln
+    for (const accId of accountIds) {
+      db.update(transactions)
+        .set({ bankAccountId: null })
+        .where(
+          and(
+            eq(transactions.bankAccountId, accId),
+            eq(transactions.userId, user.id)
+          )
+        )
+        .run();
+
+      db.delete(bankAccounts)
+        .where(
+          and(eq(bankAccounts.id, accId), eq(bankAccounts.userId, user.id))
+        )
+        .run();
+    }
+
+    // 3. Bankverbindung entfernen (nur bei echten PSD2 Banken)
+    if (connectedBankId !== "manual_banks_group") {
+      db.delete(connectedBanks)
+        .where(
+          and(
+            eq(connectedBanks.id, connectedBankId),
+            eq(connectedBanks.userId, user.id)
+          )
+        )
+        .run();
+    }
+
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Bankverbindung konnte nicht getrennt werden.",
+    };
+  }
+}
+
+export async function toggleAccountAutoSyncAction(
+  accountId: string,
+  autoSync: boolean
+) {
+  try {
+    const user = await requireUser();
+
+    db.update(bankAccounts)
+      .set({
+        autoSync,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(bankAccounts.id, accountId), eq(bankAccounts.userId, user.id))
+      )
+      .run();
+
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Synchronisationsstatus konnte nicht geändert werden.",
+    };
+  }
+}
+
+export async function deleteBankAccountAction(accountId: string) {
+  try {
+    const user = await requireUser();
+
+    // 1. Transaktionen entkoppeln, damit keine Fremdschlüssel-Fehler auftreten
+    db.update(transactions)
+      .set({ bankAccountId: null })
+      .where(
+        and(
+          eq(transactions.bankAccountId, accountId),
+          eq(transactions.userId, user.id)
+        )
+      )
+      .run();
+
+    // 2. Konto oder Karte löschen
+    db.delete(bankAccounts)
+      .where(
+        and(eq(bankAccounts.id, accountId), eq(bankAccounts.userId, user.id))
+      )
+      .run();
+
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Konto konnte nicht entfernt werden.",
+    };
+  }
+}
+
+export async function syncBankAccountAction(accountId: string) {
+  try {
+    const user = await requireUser();
+    const result = await syncBankAccountTransactions(accountId, user.id);
+
+    if (result.success) {
+      safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+      safeRevalidatePath("/transactions");
+      safeRevalidatePath("/");
+    }
+
+    return result;
+  } catch (err: unknown) {
+    return {
+      success: false,
+      importedCount: 0,
+      skippedCount: 0,
+      balanceCents: null,
+      error: (err as Error)?.message || "Synchronisation fehlgeschlagen.",
+    };
+  }
+}
+
+export async function syncAllAccountsAction() {
+  try {
+    const user = await requireUser();
+    const result = await syncAllActiveBankAccounts(user.id);
+
+    if (result.success) {
+      safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+      safeRevalidatePath("/transactions");
+      safeRevalidatePath("/");
+    }
+
+    return result;
+  } catch (err: unknown) {
+    return {
+      success: false,
+      totalImported: 0,
+      totalSkipped: 0,
+      errors: [(err as Error)?.message || "Synchronisation fehlgeschlagen."],
+    };
+  }
+}
+
+/**
+ * Verbindet eine Bank-Institution sicher mit dem Konto des Benutzers.
+ * Verschlüsselt das Token atomar mit AES-256-GCM über den Krypto-Vault.
+ */
+export async function connectBankInstitutionAction(institutionId: string) {
+  try {
+    const user = await requireUser();
+
+    // Diese Aktion legt nur simulierte Demo-Verbindungen an. Echte Banken laufen
+    // über /api/bank-sync/authorize; in Produktion ohne Opt-in gesperrt.
+    if (isLiveBankingMode() || !isMockBankingAllowed()) {
+      return {
+        success: false,
+        error: isLiveBankingMode()
+          ? "Im Live-Modus bitte die Bank über die PSD2-Autorisierung verbinden."
+          : BANK_SYNC_NOT_CONFIGURED_ERROR,
+      };
+    }
+
+    const inst = POPULAR_BANK_INSTITUTIONS.find((i) => i.id === institutionId);
+    if (!inst) {
+      return { success: false, error: "Unbekannte Bank ausgewählt." };
+    }
+
+    // Prüfen, ob diese Bank bereits verbunden ist
+    const existing = db
+      .select({ id: connectedBanks.id })
+      .from(connectedBanks)
+      .where(
+        and(
+          eq(connectedBanks.userId, user.id),
+          eq(connectedBanks.institutionId, inst.id)
+        )
+      )
+      .get();
+
+    if (existing) {
+      return {
+        success: false,
+        error: `„${inst.name}“ ist bereits mit deinem Profil verknüpft.`,
+      };
+    }
+
+    const now = new Date();
+    // 90 Tage Consent-Gültigkeit nach PSD2-Standard
+    const expiresDate = new Date();
+    expiresDate.setDate(expiresDate.getDate() + 90);
+    const consentExpiresAt = expiresDate.toISOString().slice(0, 10);
+
+    const bankId = crypto.randomUUID();
+    const rawMockToken = `psd2_access_${inst.id.toLowerCase()}_${crypto.randomBytes(16).toString("hex")}`;
+    const encryptedAccessToken = encryptBankToken(rawMockToken, user.id);
+    const consentId = `consent_${crypto.randomUUID()}`;
+
+    db.transaction((tx) => {
+      tx.insert(connectedBanks)
+        .values({
+          id: bankId,
+          userId: user.id,
+          provider: "enable_banking",
+          institutionId: inst.id,
+          institutionName: inst.name,
+          institutionLogo: inst.brandColor,
+          encryptedAccessToken,
+          encryptedRefreshToken: null,
+          consentId,
+          consentExpiresAt,
+          status: "active",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+
+      // Konten anlegen je nach Banktyp (Girokonto, Kreditkarte oder beides)
+      const isPureCard = inst.category === "credit_card";
+      const sampleIbanSuffix = Math.floor(1000 + Math.random() * 9000);
+
+      if (!isPureCard) {
+        tx.insert(bankAccounts)
+          .values({
+            id: crypto.randomUUID(),
+            connectedBankId: bankId,
+            userId: user.id,
+            accountExternalId: `acc_giro_${bankId}`,
+            ibanMasked: `DE** **** **** **** ${sampleIbanSuffix}`,
+            accountName: `${inst.name} Girokonto`,
+            accountType: "checking" as BankAccountType,
+            currency: "EUR",
+            balanceCents: null,
+            autoSync: true,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+      }
+
+      if (inst.category === "credit_card" || inst.id === "ING_DE" || inst.id === "C24_DE") {
+        const cardSuffix = Math.floor(1000 + Math.random() * 9000);
+        const cardBrand = inst.id === "ING_DE" ? "VISA Card" : "Mastercard Gold";
+        tx.insert(bankAccounts)
+          .values({
+            id: crypto.randomUUID(),
+            connectedBankId: bankId,
+            userId: user.id,
+            accountExternalId: `acc_card_${bankId}`,
+            ibanMasked: `**** **** **** ${cardSuffix}`,
+            accountName: `${inst.name} ${cardBrand}`,
+            accountType: "credit_card" as BankAccountType,
+            currency: "EUR",
+            balanceCents: null,
+            autoSync: true,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+      }
+    });
+
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/banking");
+    return {
+      success: true,
+      bankName: inst.name,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Bankverbindung konnte nicht hergestellt werden.",
+    };
+  }
+}
+
+export interface CreateManualAccountInput {
+  accountName: string;
+  accountType: BankAccountType;
+  balanceCents?: number | null;
+  creditLimitCents?: number | null;
+  billingDayOfMonth?: number | null;
+  ibanMasked?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Erstellt eine manuelle Geldquelle oder Kreditkarte (z. B. Advanzia Mastercard, TF Bank, Bargeld),
+ * die nicht über PSD2 angebunden werden kann.
+ */
+export async function createManualBankAccountAction(
+  input: CreateManualAccountInput
+) {
+  try {
+    const user = await requireUser();
+    const cleanName = input.accountName.trim();
+    if (!cleanName) {
+      return {
+        success: false,
+        error: "Bitte gib einen Namen für das Konto oder die Karte an.",
+      };
+    }
+
+    const now = new Date();
+    const accountId = crypto.randomUUID();
+
+    db.insert(bankAccounts)
+      .values({
+        id: accountId,
+        userId: user.id,
+        connectedBankId: null,
+        accountExternalId: `manual_${crypto.randomUUID()}`,
+        ibanMasked: input.ibanMasked?.trim() || null,
+        accountName: cleanName,
+        accountType: input.accountType,
+        currency: "EUR",
+        balanceCents: input.balanceCents !== undefined ? input.balanceCents : null,
+        creditLimitCents:
+          input.creditLimitCents !== undefined ? input.creditLimitCents : null,
+        billingDayOfMonth: input.billingDayOfMonth || null,
+        notes: input.notes?.trim() || null,
+        autoSync: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+
+    return { success: true, accountId };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Konto konnte nicht angelegt werden.",
+    };
+  }
+}
+
+export interface UpdateBankAccountInput {
+  accountId: string;
+  accountName?: string;
+  creditLimitCents?: number | null;
+  billingDayOfMonth?: number | null;
+  balanceCents?: number | null;
+  ibanMasked?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Aktualisiert Stammdaten, Saldo, Limit oder Abrechnungstag eines Bankkontos / einer Karte.
+ */
+export async function updateBankAccountAction(input: UpdateBankAccountInput) {
+  try {
+    const user = await requireUser();
+    const account = db
+      .select()
+      .from(bankAccounts)
+      .where(
+        and(eq(bankAccounts.id, input.accountId), eq(bankAccounts.userId, user.id))
+      )
+      .get();
+
+    if (!account) {
+      return { success: false, error: "Konto nicht gefunden." };
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+
+    if (input.accountName !== undefined && input.accountName.trim()) {
+      updatePayload.accountName = input.accountName.trim();
+    }
+    if (input.creditLimitCents !== undefined) {
+      updatePayload.creditLimitCents = input.creditLimitCents;
+    }
+    if (input.billingDayOfMonth !== undefined) {
+      updatePayload.billingDayOfMonth = input.billingDayOfMonth;
+    }
+    if (input.balanceCents !== undefined) {
+      updatePayload.balanceCents = input.balanceCents;
+    }
+    if (input.ibanMasked !== undefined) {
+      updatePayload.ibanMasked = input.ibanMasked ? input.ibanMasked.trim() : null;
+    }
+    if (input.notes !== undefined) {
+      updatePayload.notes = input.notes ? input.notes.trim() : null;
+    }
+
+    db.update(bankAccounts)
+      .set(updatePayload)
+      .where(eq(bankAccounts.id, account.id))
+      .run();
+
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/settings");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Konto konnte nicht aktualisiert werden.",
+    };
+  }
+}
+
+export interface AccountTransferInput {
+  sourceAccountId: string;
+  targetAccountId: string;
+  amountCents: number;
+  date?: string;
+  description?: string;
+}
+
+/**
+ * Führt eine interne Umbuchung oder einen Kartenausgleich durch (z. B. Girokonto -> Advanzia/TF Bank).
+ * Belastet das Ausgangskonto, schreibt dem Zielkonto gut und verbucht dies als neutrale Transfer-Buchung,
+ * sodass der Monats-Cashflow und Lebenshaltungsausgaben nicht fälschlich doppelt gezählt werden.
+ */
+export async function transferBetweenAccountsAction(
+  input: AccountTransferInput
+) {
+  try {
+    const user = await requireUser();
+    if (input.sourceAccountId === input.targetAccountId) {
+      return {
+        success: false,
+        error: "Ausgangs- und Zielkonto dürfen nicht identisch sein.",
+      };
+    }
+    if (input.amountCents <= 0) {
+      return {
+        success: false,
+        error: "Der Überweisungsbetrag muss größer als 0 sein.",
+      };
+    }
+
+    const sourceAccount = db
+      .select()
+      .from(bankAccounts)
+      .where(
+        and(
+          eq(bankAccounts.id, input.sourceAccountId),
+          eq(bankAccounts.userId, user.id)
+        )
+      )
+      .get();
+    if (!sourceAccount) {
+      return { success: false, error: "Ausgangskonto wurde nicht gefunden." };
+    }
+
+    const targetAccount = db
+      .select()
+      .from(bankAccounts)
+      .where(
+        and(
+          eq(bankAccounts.id, input.targetAccountId),
+          eq(bankAccounts.userId, user.id)
+        )
+      )
+      .get();
+    if (!targetAccount) {
+      return { success: false, error: "Zielkonto wurde nicht gefunden." };
+    }
+
+    const transferCategory = getOrCreateTransferCategory(user.id);
+    const now = new Date();
+    const transferDate = input.date || now.toISOString().slice(0, 10);
+    if (!transferCategory) {
+      return { success: false, error: "Umbuchungs-Kategorie konnte nicht angelegt werden." };
+    }
+
+    // Bank-synchronisierte Konten liefern ihre Seite der Umbuchung selbst –
+    // dort weder Saldo ändern noch eine eigene Buchung anlegen (sonst doppelt)
+    const sourceSynced = Boolean(sourceAccount.connectedBankId);
+    const targetSynced = Boolean(targetAccount.connectedBankId);
+    if (sourceSynced && targetSynced) {
+      return {
+        success: false,
+        error:
+          "Beide Konten werden von der Bank synchronisiert – die Umbuchung erscheint dort automatisch.",
+      };
+    }
+
+    const customDesc = input.description?.trim();
+    const outDesc =
+      customDesc ||
+      `Kartenausgleich / Umbuchung an ${targetAccount.accountName}`;
+    const inDesc =
+      customDesc ||
+      `Ausgleichszahlung von ${sourceAccount.accountName}`;
+
+    db.transaction((tx) => {
+      // 1. Ausgangskonto belasten
+      if (!sourceSynced && sourceAccount.balanceCents !== null) {
+        tx.update(bankAccounts)
+          .set({
+            balanceCents: sourceAccount.balanceCents - input.amountCents,
+            updatedAt: now,
+          })
+          .where(eq(bankAccounts.id, sourceAccount.id))
+          .run();
+      }
+
+      // 2. Zielkonto gutschreiben
+      if (!targetSynced && targetAccount.balanceCents !== null) {
+        tx.update(bankAccounts)
+          .set({
+            balanceCents: targetAccount.balanceCents + input.amountCents,
+            updatedAt: now,
+          })
+          .where(eq(bankAccounts.id, targetAccount.id))
+          .run();
+      }
+
+      // 3. Ausgehende Buchung auf Ausgangskonto (costType: transfer -> neutral für Konsumausgaben)
+      if (!sourceSynced) tx.insert(transactions)
+        .values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          categoryId: transferCategory!.id,
+          type: "expense",
+          costType: "transfer",
+          amountCents: input.amountCents,
+          date: transferDate,
+          description: outDesc,
+          bankAccountId: sourceAccount.id,
+          paymentMethod: "transfer",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+
+      // 4. Eingehende Buchung auf Zielkonto (costType: transfer -> neutral für Einnahmen)
+      if (!targetSynced) tx.insert(transactions)
+        .values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          categoryId: transferCategory!.id,
+          type: "income",
+          costType: "transfer",
+          amountCents: input.amountCents,
+          date: transferDate,
+          description: inDesc,
+          bankAccountId: targetAccount.id,
+          paymentMethod: "transfer",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    });
+
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+    safeRevalidatePath("/settings");
+
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Umbuchung fehlgeschlagen.",
+    };
+  }
+}
+
+export interface ReconcileBalanceInput {
+  accountId: string;
+  actualBalanceCents: number;
+  mode?: "adjustment_transaction" | "set_balance"; // Default: adjustment_transaction
+  date?: string;
+  description?: string;
+}
+
+/**
+ * Kassensturz & Saldenabgleich:
+ * Gleicht das Konto auf den tatsächlich eingegebenen Cent-Betrag ab.
+ * Im Modus "adjustment_transaction" wird automatisch eine Ausgleichsbuchung angelegt,
+ * im Modus "set_balance" wird der Saldo direkt angepasst.
+ */
+export async function reconcileAccountBalanceAction(input: ReconcileBalanceInput) {
+  try {
+    const user = await requireUser();
+    const account = db
+      .select()
+      .from(bankAccounts)
+      .where(
+        and(eq(bankAccounts.id, input.accountId), eq(bankAccounts.userId, user.id))
+      )
+      .get();
+
+    if (!account) {
+      return { success: false, error: "Konto nicht gefunden." };
+    }
+
+    const currentBal = account.balanceCents ?? 0;
+    const targetBal = input.actualBalanceCents;
+    const diff = targetBal - currentBal;
+
+    if (diff === 0) {
+      return {
+        success: true,
+        diffCents: 0,
+        message: "Der Kontostand stimmt bereits exakt überein.",
+      };
+    }
+
+    const mode = input.mode || "adjustment_transaction";
+    const now = new Date();
+    const bookingDate = input.date || now.toISOString().slice(0, 10);
+
+    if (mode === "adjustment_transaction") {
+      // Passende Kategorie für Ausgleich / Sonstiges finden
+      const userCats = db
+        .select()
+        .from(categories)
+        .where(eq(categories.userId, user.id))
+        .all();
+
+      const targetCategory =
+        userCats.find((c) => /umbuchung|ausgleich|sonstig/i.test(c.name)) ||
+        userCats[0];
+
+      if (!targetCategory) {
+        return { success: false, error: "Keine Kategorie für Ausgleichsbuchung gefunden." };
+      }
+
+      const isDiffPositive = diff > 0;
+      const absDiff = Math.abs(diff);
+      const desc =
+        input.description?.trim() ||
+        `Kassensturz / Saldenabgleich (${account.accountName})`;
+
+      db.transaction((tx) => {
+        // Transaktion erfassen
+        tx.insert(transactions)
+          .values({
+            id: crypto.randomUUID(),
+            userId: user.id,
+            categoryId: targetCategory.id,
+            type: isDiffPositive ? "income" : "expense",
+            costType: "transfer",
+            amountCents: absDiff,
+            date: bookingDate,
+            description: desc,
+            bankAccountId: account.id,
+            paymentMethod:
+              account.accountType === "cash"
+                ? "cash"
+                : account.accountType === "credit_card"
+                  ? "card"
+                  : "transfer",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+
+        // Saldo auf den Zielbetrag setzen
+        tx.update(bankAccounts)
+          .set({
+            balanceCents: targetBal,
+            updatedAt: now,
+          })
+          .where(eq(bankAccounts.id, account.id))
+          .run();
+      });
+    } else {
+      // Nur Saldo direkt überschreiben
+      db.update(bankAccounts)
+        .set({
+          balanceCents: targetBal,
+          updatedAt: now,
+        })
+        .where(eq(bankAccounts.id, account.id))
+        .run();
+    }
+
+    safeRevalidatePath("/banking");
+    safeRevalidatePath("/transactions");
+    safeRevalidatePath("/");
+
+    return {
+      success: true,
+      diffCents: diff,
+      message: `Kontostand erfolgreich auf ${(targetBal / 100).toFixed(2).replace(".", ",")} € abgeglichen.`,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: (err as Error)?.message || "Saldenabgleich fehlgeschlagen.",
+    };
+  }
+}

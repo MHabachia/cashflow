@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --border: 240 6% 90%;
+    --destructive: 0 84% 60%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --border: 240 4% 18%;
+    --destructive: 0 63% 50%;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+@theme inline {
+  --color-brand: var(--brand-primary);
+}
+
+:root {
+  --brand-primary: #2563eb;
+}
+
+/* Dynamische Branding-Akzentfarbe aus dem Admin-Panel für Primär-Buttons, Rahmen & Links */
+.bg-blue-600 {
+  background-color: var(--brand-primary) !important;
+}
+.hover\:bg-blue-700:hover {
+  background-color: color-mix(in srgb, var(--brand-primary) 85%, black) !important;
+}
+.text-blue-600 {
+  color: var(--brand-primary) !important;
+}
+.text-blue-500 {
+  color: var(--brand-primary) !important;
+}
+.dark .dark\:text-blue-400,
+.dark .dark\:text-blue-300,
+.dark .dark\:text-blue-500 {
+  color: color-mix(in srgb, var(--brand-primary) 78%, white) !important;
+}
+.border-blue-600 {
+  border-color: var(--brand-primary) !important;
+}
+.border-blue-500 {
+  border-color: var(--brand-primary) !important;
+}
+.ring-blue-600,
+.ring-blue-500 {
+  --tw-ring-color: var(--brand-primary) !important;
+}
+.focus\:ring-blue-500:focus,
+.focus\:ring-blue-600:focus {
+  --tw-ring-color: var(--brand-primary) !important;
+}
+
+/* Transparente Hintergründe & sanfte Badges angepasst an die Akzentfarbe */
+.bg-blue-500\/10,
+.bg-blue-500\/15,
+.bg-blue-50 {
+  background-color: color-mix(in srgb, var(--brand-primary) 12%, transparent) !important;
+}
+.dark .dark\:bg-blue-950\/40,
+.dark .dark\:bg-blue-950\/50,
+.dark .dark\:bg-blue-950\/60,
+.dark .bg-blue-500\/10,
+.dark .bg-blue-500\/15,
+.dark .bg-blue-50 {
+  background-color: color-mix(in srgb, var(--brand-primary) 18%, transparent) !important;
+}
+.border-blue-500\/20,
+.border-blue-500\/25,
+.border-blue-200\/50 {
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, transparent) !important;
+}
+.dark .dark\:border-blue-900\/50 {
+  border-color: color-mix(in srgb, var(--brand-primary) 32%, transparent) !important;
+}
+
+/* Einheitliche Lesbarkeit & optimierter Kontrast im Dunkelmodus */
+.dark .text-zinc-500 {
+  color: #a1a1aa; /* Verbesserter Kontrast für Sekundär- und Datumsangaben im Dark Mode */
+}
+.dark .text-zinc-600 {
+  color: #d4d4d8;
+}
+.dark .text-zinc-700 {
+  color: #e4e4e7;
+}
+
+/* iOS Safe Area Hilfsklassen für Notch und Home-Indicator */
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* iOS zoomt bei Eingabefeldern < 16px automatisch hinein. Statt Zoomen
+   komplett zu sperren (Barrierefreiheit), auf kleinen Bildschirmen 16px. */
+@media (max-width: 640px) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Bewegungsreduzierung respektieren */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
