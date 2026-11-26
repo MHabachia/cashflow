@@ -1,0 +1,17 @@
+# Nicht in den Build-Kontext: Abhängigkeiten werden im Image neu installiert,
+# Daten und Secrets gehören nicht ins Image.
+.git
+.github
+node_modules
+.next
+data
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+blob-report
+*.log
+*.tsbuildinfo
+.DS_Store
+docs

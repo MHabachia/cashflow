@@ -79,7 +79,8 @@ describe("Passwort-Wiederherstellung ohne E-Mail", async () => {
   it("Passwort-Regeln", () => {
     assert.ok(pr.validateNewPassword("kurz"));
     assert.ok(pr.validateNewPassword("x".repeat(129)));
-    assert.equal(pr.validateNewPassword("lang genug!"), null);
+    assert.ok(pr.validateNewPassword("elf Zeichen"), "11 Zeichen sind zu kurz");
+    assert.equal(pr.validateNewPassword("zwölf Zeichen"), null);
   });
 
   it("Benutzer nur mit Passkey bekommt ein Passwort-Konto", async () => {

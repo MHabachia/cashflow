@@ -1,5 +1,6 @@
 "use client";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -409,12 +410,12 @@ export function AdminDashboardView({
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1">
-                    Initiales Passwort (mind. 8 Zeichen)
+                    Initiales Passwort (mind. {PASSWORD_MIN_LENGTH} Zeichen)
                   </label>
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"

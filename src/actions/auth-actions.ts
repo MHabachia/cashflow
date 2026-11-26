@@ -1,5 +1,6 @@
 "use server";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { auth, getUserCount } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -29,7 +30,7 @@ const registerSchema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
   password: z
     .string()
-    .min(8, "Passwort muss mindestens 8 Zeichen lang sein."),
+    .min(PASSWORD_MIN_LENGTH, `Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen lang sein.`),
   inviteToken: z.string().optional(),
 });
 
@@ -301,10 +302,10 @@ export async function changeOwnPasswordAction(input: {
 }) {
   const user = await requireUser();
 
-  if (!input.newPassword || input.newPassword.length < 8) {
+  if (!input.newPassword || input.newPassword.length < PASSWORD_MIN_LENGTH) {
     return {
       success: false,
-      error: "Das neue Passwort muss mindestens 8 Zeichen lang sein.",
+      error: `Das neue Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen lang sein.`,
     };
   }
 

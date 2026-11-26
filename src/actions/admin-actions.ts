@@ -1,5 +1,6 @@
 "use server";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -26,7 +27,7 @@ import path from "node:path";
 const createUserSchema = z.object({
   name: z.string().min(2, "Name muss mindestens 2 Zeichen lang sein."),
   email: z.string().email("Ungültige E-Mail-Adresse."),
-  password: z.string().min(8, "Passwort muss mindestens 8 Zeichen haben."),
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen haben.`),
   role: z.enum(["user", "admin"]).default("user"),
 });
 

@@ -2,24 +2,26 @@
   "name": "cashflow",
   "version": "1.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
-    "test:unit": "NODE_ENV=test DATABASE_PATH=${DATABASE_PATH:-./data/test-shared.db} UPLOADS_DIR=${UPLOADS_DIR:-./data/test-uploads} tsx --test tests/unit/*.test.ts",
+    "test:unit": "node scripts/run-unit-tests.mjs",
     "test:e2e": "playwright test",
     "test": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.27",
     "@serwist/next": "^9.0.12",
-    "@types/qrcode": "^1.5.6",
-    "better-auth": "^1.2.5",
+    "better-auth": "^1.7.27",
     "better-sqlite3": "^13.2.0",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -42,6 +44,7 @@
     "@tailwindcss/postcss": "^4.0.9",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.13.9",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "drizzle-kit": "^0.31.4",
@@ -50,6 +53,9 @@
     "typescript": "^5.8.2"
   },
   "overrides": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "next": {
+      "postcss": "^8.5.33"
+    }
   }
 }

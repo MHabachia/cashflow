@@ -1,5 +1,7 @@
 "use client";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
+
 export function NewPasswordFields({
   password,
   confirm,
@@ -16,13 +18,13 @@ export function NewPasswordFields({
     <>
       <div>
         <label htmlFor="new-password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
-          Neues Passwort (mind. 8 Zeichen)
+          Neues Passwort (mind. {PASSWORD_MIN_LENGTH} Zeichen)
         </label>
         <input
           id="new-password"
           type="password"
           required
-          minLength={8}
+          minLength={PASSWORD_MIN_LENGTH}
           maxLength={128}
           autoComplete="new-password"
           value={password}

@@ -18,10 +18,12 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
+    // Details nur ins Log, der öffentliche Endpunkt gibt keine Interna preis
+    console.error("[Health] Datenbankprüfung fehlgeschlagen:", error);
     return NextResponse.json(
       {
         status: "error",
-        message: error instanceof Error ? error.message : "Database error",
+        database: "unavailable",
       },
       { status: 500 }
     );
