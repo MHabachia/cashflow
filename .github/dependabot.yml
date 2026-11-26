@@ -8,13 +8,32 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # Laufzeit ist Node.js 22 (siehe .nvmrc); die Typen folgen der Laufzeit.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Große Umstellungen, die eine eigene Migration brauchen
+      # (Next.js 16: Turbopack-Build; TypeScript 7; Recharts 3: neue Typen).
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "recharts"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Wechsel der Node.js-Hauptversion nur gemeinsam mit .nvmrc, engines und CI
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

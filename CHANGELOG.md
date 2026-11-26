@@ -6,6 +6,11 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Changed
+- `lucide-react` auf 1.x aktualisiert.
+- GitHub Actions aktualisiert (checkout 7, setup-node 7, Docker-Actions für Buildx, Login, Metadaten und Build).
+- Dependabot fasst Action-Updates in einer PR zusammen und schlägt keine Hauptversionen mehr vor, die eine eigene Migration brauchen (Node.js, Next.js, TypeScript, Recharts).
+
 ## [1.2.1] – 2026-11-26
 
 Bank nach einem Schlüsselwechsel wieder verbinden.
