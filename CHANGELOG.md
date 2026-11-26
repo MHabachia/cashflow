@@ -6,6 +6,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+## [1.2.1] – 2026-11-26
+
+Bank nach einem Schlüsselwechsel wieder verbinden.
+
 ### Fixed
 - Scheitert der Abruf einer Bank (z. B. weil das Token nach einem Schlüsselwechsel nicht mehr lesbar ist), zeigt die Bankkarte jetzt „Neu verbinden“. Vorher gab es dafür nur „Zustimmung erneuern“ kurz vor Ablauf, und „Trennen“ hätte die Konten gelöscht.
 - Beim erneuten Verbinden bleiben selbst vergebene Kontonamen erhalten; alte Abruffehler und die Abruf-Pause werden zurückgesetzt.
@@ -147,6 +151,7 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 - Next.js, TypeScript, SQLite mit Drizzle, Anmeldung mit Better Auth.
 - Kategorien und manuell erfasste Buchungen.
 
-[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/MHabachia/cashflow/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/MHabachia/cashflow/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MHabachia/cashflow/releases/tag/v1.1.0

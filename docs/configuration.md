@@ -7,7 +7,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt, am einfachsten in ei
 | `AUTH_SECRET` / `BETTER_AUTH_SECRET` | Secret für Sitzungen (mind. 32 Zeichen, z. B. `openssl rand -base64 32`). Leer lassen: Der Container erzeugt beim ersten Start eines und speichert es in `/data/.auth-secret` | *(auto)* |
 | `APP_URL` | Öffentliche Adresse der App, z. B. `https://cashflow.example.org` | `http://localhost:3000` |
 | `BIND_ADDRESS` | Nur `docker-compose.yml`: Adresse, an die Port 3000 gebunden wird. `0.0.0.0` für direkten Zugriff im Netzwerk | `127.0.0.1` |
-| `CASHFLOW_VERSION` | Nur `docker-compose.yml`: Image-Tag, z. B. `1.2.0` | `latest` |
+| `CASHFLOW_VERSION` | Nur `docker-compose.yml`: Image-Tag, z. B. `1.2.1` | `latest` |
 | `UPDATE_CHECK` | `false` schaltet den Update-Hinweis im Admin-Bereich ab | *(an)* |
 | `ALLOW_DEMO_SEED` | Erlaubt `npm run db:seed` mit `NODE_ENV=production` (nur für Tests) | *(aus)* |
 | `ENABLE_BANKING_APPLICATION_ID` | Anwendungs-ID für Enable Banking (Live-PSD2) | *(Optional)* |
