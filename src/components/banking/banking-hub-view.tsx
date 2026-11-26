@@ -534,6 +534,10 @@ export function BankingHubView({
               daysLeft <= 0 ||
               bank.status === "expired" ||
               bank.status === "revoked";
+            // Scheitert der Abruf (z. B. Tokens nach Schlüsselwechsel nicht lesbar),
+            // hilft eine neue Freigabe bei der Bank; Konten und Buchungen bleiben.
+            const hasSyncError =
+              bank.status === "error" || bank.accounts.some((a) => Boolean(a.lastSyncError));
             const statusBadge = bank.isManual
               ? { label: "Manuell", className: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400" }
               : isExpired
@@ -611,21 +615,22 @@ export function BankingHubView({
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto">
-                    {/* Zustimmung erneuern bei bald ablaufender oder abgelaufener PSD2-Zustimmung */}
-                    {!bank.isManual && (isExpired || isExpiringSoon) && (
+                    {/* Zustimmung erneuern bei bald ablaufender oder abgelaufener PSD2-Zustimmung
+                        oder neu verbinden, wenn der Abruf fehlschlägt */}
+                    {!bank.isManual && (isExpired || isExpiringSoon || hasSyncError) && (
                       <button
                         type="button"
                         onClick={() => handleConnect(bank.institutionId)}
                         disabled={connectingId === bank.institutionId}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition flex items-center gap-1.5 cursor-pointer"
-                        title="PSD2-Zustimmung bei der Bank erneuern"
+                        title="Bei der Bank erneut freigeben. Konten und Buchungen bleiben erhalten."
                       >
                         {connectingId === bank.institutionId ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <RefreshCw className="w-3.5 h-3.5" />
                         )}
-                        <span>Zustimmung erneuern</span>
+                        <span>{isExpired || isExpiringSoon ? "Zustimmung erneuern" : "Neu verbinden"}</span>
                       </button>
                     )}
 

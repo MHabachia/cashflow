@@ -152,9 +152,13 @@ export async function GET(request: NextRequest) {
           tx.update(bankAccounts)
             .set({
               accountExternalId: acc.accountExternalId,
-              accountName: acc.accountName,
+              // Selbst vergebenen Namen behalten
+              accountName: existingAccount.accountName || acc.accountName,
               ibanMasked: acc.ibanMasked,
               balanceCents: acc.balanceCents !== null ? acc.balanceCents : existingAccount.balanceCents,
+              // Neue Freigabe: alten Fehler und Abruf-Pause zurücksetzen
+              lastSyncError: null,
+              syncBackoffUntil: null,
               updatedAt: now,
             })
             .where(eq(bankAccounts.id, existingAccount.id))

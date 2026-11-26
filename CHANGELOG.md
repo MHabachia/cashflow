@@ -6,6 +6,11 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Fixed
+- Scheitert der Abruf einer Bank (z. B. weil das Token nach einem Schlüsselwechsel nicht mehr lesbar ist), zeigt die Bankkarte jetzt „Neu verbinden“. Vorher gab es dafür nur „Zustimmung erneuern“ kurz vor Ablauf, und „Trennen“ hätte die Konten gelöscht.
+- Beim erneuten Verbinden bleiben selbst vergebene Kontonamen erhalten; alte Abruffehler und die Abruf-Pause werden zurückgesetzt.
+- Die Fehlermeldung bei unbekanntem Token-Schlüssel nennt jetzt „Neu verbinden“ als Lösung.
+
 ## [1.2.0] – 2026-11-26
 
 Sicherheit und Betrieb gehärtet, Dokumentation aufgeteilt.

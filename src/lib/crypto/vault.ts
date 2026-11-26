@@ -174,7 +174,7 @@ export function decryptBankToken(encryptedPayload: string, userId: string): stri
     const keyMaterial = getDecryptionKeys().find((k) => k.id === kid);
     if (!keyMaterial) {
       throw new Error(
-        "Entschlüsselung fehlgeschlagen: Schlüssel nicht verfügbar (TOKEN_ENCRYPTION_KEY geändert? Alten Schlüssel in TOKEN_ENCRYPTION_KEY_PREVIOUS hinterlegen)."
+        "Entschlüsselung fehlgeschlagen: Schlüssel nicht verfügbar. Bank über „Neu verbinden“ erneut freigeben oder den alten Schlüssel in TOKEN_ENCRYPTION_KEY_PREVIOUS hinterlegen."
       );
     }
     try {
