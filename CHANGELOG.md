@@ -6,6 +6,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+## [1.2.0] – 2026-11-26
+
+Sicherheit und Betrieb gehärtet, Dokumentation aufgeteilt.
+
 ### Security
 - Beispiel- und Platzhalter-Secrets (z. B. mit `changeme`, `eintragen`, `example`) werden in Produktion abgewiesen. Das Beispiel in der Dokumentation enthielt vorher ein Secret, das die Prüfung bestand.
 - Docker-Images werden nur noch für Versions-Tags gebaut und erst, nachdem die komplette CI grün ist. Vorher wurde jeder Push auf `main` ungeprüft als `latest` veröffentlicht.
@@ -138,5 +142,6 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 - Next.js, TypeScript, SQLite mit Drizzle, Anmeldung mit Better Auth.
 - Kategorien und manuell erfasste Buchungen.
 
-[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/MHabachia/cashflow/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MHabachia/cashflow/releases/tag/v1.1.0
