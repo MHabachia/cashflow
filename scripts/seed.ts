@@ -16,6 +16,14 @@ import { eq } from "drizzle-orm";
 import crypto from "node:crypto";
 
 async function runSeed() {
+  // Das Seed legt ein Demo-Konto mit bekanntem Passwort an. In Produktion nie.
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "true") {
+    console.error(
+      "Abbruch: Das Seed-Skript legt ein Demo-Konto mit bekanntem Passwort an und ist nur für die lokale Entwicklung gedacht."
+    );
+    process.exit(1);
+  }
+
   console.log("Starte Seed-Skript mit Beispieldaten...");
 
   const demoEmail = "admin@kosten.local";

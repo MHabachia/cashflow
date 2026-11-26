@@ -20,8 +20,8 @@ import crypto from "node:crypto";
  * Tokens und Codes werden nur als Hash gespeichert.
  */
 
-export const PASSWORD_MIN_LENGTH = 8;
-export const PASSWORD_MAX_LENGTH = 128;
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH };
 export const RESET_TOKEN_TTL_HOURS = 24;
 export const RECOVERY_CODE_COUNT = 8;
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // ohne 0/O, 1/I/L

@@ -1,28 +1,43 @@
 services:
   cashflow:
-    image: ghcr.io/mhabachia/cashflow:latest
+    image: ghcr.io/mhabachia/cashflow:${CASHFLOW_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile
     container_name: cashflow-app
     restart: unless-stopped
+    # Standardmäßig nur lokal erreichbar (für einen Reverse Proxy auf demselben
+    # Host). Für direkten Zugriff im Heimnetz BIND_ADDRESS=0.0.0.0 setzen und
+    # dann IP_ADDRESS_HEADERS leer lassen, damit sich keine IP vortäuschen lässt.
     ports:
-      - "3000:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:3000:3000"
+    # Alle Variablen aus .env (AUTH_SECRET, TOKEN_ENCRYPTION_KEY, ENABLE_BANKING_*,
+    # VAPID_*, TRUSTED_*, UPDATE_CHECK …) werden an die App durchgereicht.
+    env_file:
+      - path: .env
+        required: false
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/data/app.db
       - UPLOADS_DIR=/data/uploads
-      - BETTER_AUTH_SECRET=${AUTH_SECRET:-bitte-in-env-setzen-mindestens-32-zeichen}
-      - AUTH_SECRET=${AUTH_SECRET:-bitte-in-env-setzen-mindestens-32-zeichen}
-      - BETTER_AUTH_URL=${APP_URL:-http://localhost:3000}
       - APP_URL=${APP_URL:-http://localhost:3000}
+      - BETTER_AUTH_URL=${APP_URL:-http://localhost:3000}
       - NEXT_PUBLIC_APP_URL=${APP_URL:-http://localhost:3000}
-      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
-      - CRON_SECRET=${CRON_SECRET:-}
-      - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY:-}
-      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
     volumes:
       - ./data:/data
+    # Härtung: keine zusätzlichen Rechte über setuid, nur die Fähigkeiten, die
+    # der Entrypoint zum Anpassen der Dateirechte von /data und zum Wechsel auf
+    # den Benutzer nextjs braucht.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s

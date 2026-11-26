@@ -1,5 +1,6 @@
 "use client";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -186,14 +187,14 @@ function RegisterFormContent() {
 
           <div>
             <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
-              Passwort (mind. 8 Zeichen)
+              Passwort (mind. {PASSWORD_MIN_LENGTH} Zeichen)
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"

@@ -1,5 +1,6 @@
 "use client";
 
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { useState } from "react";
 import { changeOwnPasswordAction } from "@/actions/auth-actions";
 import { KeyRound, Check, Loader2 } from "lucide-react";
@@ -55,12 +56,12 @@ export function PasswordChangeCard() {
         </div>
         <div>
           <label className="block text-xs font-medium text-zinc-500 mb-1">
-            Neues Passwort (mind. 8 Zeichen)
+            Neues Passwort (mind. {PASSWORD_MIN_LENGTH} Zeichen)
           </label>
           <input
             type="password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             autoComplete="new-password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}

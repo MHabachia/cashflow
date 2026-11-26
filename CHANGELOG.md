@@ -1,12 +1,40 @@
 # Changelog
 
-Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentlichten Stand in Stufen zusammen. Ab 1.1.0 wird je Release geführt.
+Alle wichtigen Änderungen an Cashflow. Das Format folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), die Versionen folgen [Semantic Versioning](https://semver.org/lang/de/).
 
-## 1.1.0
+Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentlichten Stand in Stufen zusammen und haben deshalb kein Datum. Ab 1.1.0 wird je Release geführt.
+
+## [Unreleased]
+
+### Security
+- Beispiel- und Platzhalter-Secrets (z. B. mit `changeme`, `eintragen`, `example`) werden in Produktion abgewiesen. Das Beispiel in der Dokumentation enthielt vorher ein Secret, das die Prüfung bestand.
+- Docker-Images werden nur noch für Versions-Tags gebaut und erst, nachdem die komplette CI grün ist. Vorher wurde jeder Push auf `main` ungeprüft als `latest` veröffentlicht.
+- `/api/health` gibt im Fehlerfall keine internen Fehlermeldungen mehr aus.
+- `localhost` ist in Produktion kein vertrauenswürdiger Ursprung mehr für die Auth-API; zusätzliche Hosts kommen aus `TRUSTED_HOSTS`.
+- Neue Passwörter müssen mindestens 12 statt 8 Zeichen lang sein.
+- Das Demo-Seed mit bekanntem Passwort verweigert den Start in Produktion.
+- Abhängigkeiten: PostCSS in Next.js über einen Override auf 8.5 angehoben (bekannte Schwachstellen); `npm audit --omit=dev` läuft in der CI.
+- GitHub Actions auf Commit-SHAs festgelegt, Docker-Basis-Image auf Version und Digest.
+
+### Changed
+- `docker-compose.yml`: Port standardmäßig nur an `127.0.0.1` gebunden (`BIND_ADDRESS`), alle Variablen aus `.env` werden durchgereicht, Image-Version über `CASHFLOW_VERSION`, Härtung mit `no-new-privileges` und reduzierten Linux-Fähigkeiten.
+- Ohne `AUTH_SECRET` erzeugt der Container beim ersten Start ein Secret und speichert es in `/data/.auth-secret`.
+- Dockerfile nutzt `npm ci`; neue `.dockerignore` hält `.env`, `data/` und `.git` aus dem Build-Kontext.
+- `scripts/backup.sh` sichert auch das automatisch erzeugte Secret und weist darauf hin, dass die Sicherung unverschlüsselt ist.
+- Unit-Tests laufen plattformunabhängig (`scripts/run-unit-tests.mjs`), `engines` und `.nvmrc` legen Node.js 22 fest.
+- `better-auth` als `^1.7.27` passend zu `@better-auth/passkey`; `@types/qrcode` unter `devDependencies`.
+- Das nicht funktionierende Skript `npm run lint` entfernt, dafür `npm run typecheck`.
+- Dokumentation aufgeteilt in `docs/` (Installation, Konfiguration, Bankanbindung, Sicherung, Sicherheit) mit Hinweisen zum Aktualisieren; doppelte Abschnitte in der README entfernt.
+
+### Added
+- `SECURITY.md` mit Meldeweg für Schwachstellen.
+- Dependabot für npm, GitHub Actions und Docker.
+
+## [1.1.0] – 2026-11-25
 
 Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 
-### Oberfläche
+### Changed
 - Löschen einer Buchung mit „Rückgängig“ (6 Sekunden) statt Bestätigungsdialog.
 - Prüfliste: Wischen nach rechts bestätigt, nach links öffnet die Kategorie.
 - Umsatz-Filter bleiben in der Sitzung erhalten, dazu „Filter zurücksetzen“.
@@ -14,19 +42,17 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 - Das Dashboard startet mit Verfügbar-Betrag, Konten, Budgets und letzten Buchungen; Weiteres über „Anpassen“.
 - Leere Zustände mit direktem Button, Mindestschrift 12 px, größere Tippflächen im Kopfbereich.
 
-### Neue Funktionen
+### Added
 - Fixkosten-Kalender mit Warnung, wenn der Kontostand für die anstehenden Fixkosten nicht reicht.
 - Monatsabschluss: Rückblick auf den Vormonat in den ersten zehn Tagen des Monats.
 - Sparziele zeigen „Im Plan“ oder „hinter dem Plan“.
 - Export: zusätzlich Summen je Kategorie als CSV.
-
-### Admin
-- Systemzustand: Version, Alter der letzten Sicherung, freier Speicher, Bankverbindungen mit letztem Abruf und Restlaufzeit der Zustimmung.
-- Sicherungen lassen sich prüfen (Integritätsprüfung in einer temporären Datenbank, Eintrag im Sicherheitsprotokoll).
-- Update-Hinweis auf neue Releases. Es werden keine Nutzerdaten gesendet; abschaltbar mit `UPDATE_CHECK=false`.
-- Branding: Vorschau, freie Hex-Eingabe und Kontrastwarnung für die Akzentfarbe.
-- Einladungen mit wählbarer Gültigkeit (1, 7 oder 30 Tage).
-- Sicherheitsprotokoll mit Filter und Suche; Hinweis bei vielen Fehlversuchen innerhalb von 24 Stunden.
+- Admin: Systemzustand: Version, Alter der letzten Sicherung, freier Speicher, Bankverbindungen mit letztem Abruf und Restlaufzeit der Zustimmung.
+- Admin: Sicherungen lassen sich prüfen (Integritätsprüfung in einer temporären Datenbank, Eintrag im Sicherheitsprotokoll).
+- Admin: Update-Hinweis auf neue Releases. Es werden keine Nutzerdaten gesendet; abschaltbar mit `UPDATE_CHECK=false`.
+- Admin: Branding: Vorschau, freie Hex-Eingabe und Kontrastwarnung für die Akzentfarbe.
+- Admin: Einladungen mit wählbarer Gültigkeit (1, 7 oder 30 Tage).
+- Admin: Sicherheitsprotokoll mit Filter und Suche; Hinweis bei vielen Fehlversuchen innerhalb von 24 Stunden.
 
 ## 1.0.0 – Ruhigere Oberfläche
 
@@ -111,3 +137,6 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 
 - Next.js, TypeScript, SQLite mit Drizzle, Anmeldung mit Better Auth.
 - Kategorien und manuell erfasste Buchungen.
+
+[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/MHabachia/cashflow/releases/tag/v1.1.0

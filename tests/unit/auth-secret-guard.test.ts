@@ -62,4 +62,15 @@ describe("Strict Production AUTH_SECRET Guard", () => {
     assert.strictEqual(res.valid, true);
     assert.strictEqual(res.error, undefined);
   });
+
+  it("verhindert in Produktion kopierte Beispiel-Secrets aus der Dokumentation", () => {
+    for (const secret of [
+      "bitte-eigenes-32-zeichen-secret-eintragen",
+      "CHANGE_ME_CHANGE_ME_CHANGE_ME_CHANGE_ME",
+      "changeme-changeme-changeme-changeme-12",
+    ]) {
+      const res = validateAuthSecret({ secret, nodeEnv: "production", isBuildPhase: false });
+      assert.strictEqual(res.valid, false, secret);
+    }
+  });
 });
