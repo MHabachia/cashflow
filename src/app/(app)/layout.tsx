@@ -85,7 +85,7 @@ export default async function AppLayout({
           </div>
         ) : null
       }
-      pwaStatusBar={<PwaStatusBar />}
+      pwaStatusBar={<PwaStatusBar userId={user.id} />}
       bottomNav={
         <BottomNav
           categories={userCategories.map((c) => ({

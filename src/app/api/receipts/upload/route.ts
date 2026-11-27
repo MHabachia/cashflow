@@ -5,6 +5,11 @@ import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import {
+  checkDeclaredUploadSize,
+  directorySizeBytes,
+  receiptsQuotaBytes,
+} from "@/lib/upload-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +31,11 @@ export async function POST(req: NextRequest) {
 
   const settings = getGlobalAppSettings();
   const maxFileSize = (settings.maxUploadSizeMb || 15) * 1024 * 1024;
+
+  const sizeProblem = checkDeclaredUploadSize(req.headers, maxFileSize);
+  if (sizeProblem) {
+    return NextResponse.json({ error: sizeProblem.error }, { status: sizeProblem.status });
+  }
 
   try {
     const formData = await req.formData();
@@ -75,6 +85,16 @@ export async function POST(req: NextRequest) {
       process.env.UPLOADS_DIR || "./data/uploads"
     );
     const userDir = path.join(uploadsRoot, session.user.id);
+
+    // Kontingent je Benutzer, damit niemand die Platte füllen kann.
+    // Geprüft mit der Originalgröße; gespeichert wird das kleinere WebP.
+    const quota = receiptsQuotaBytes();
+    if (quota > 0 && directorySizeBytes(userDir) + file.size > quota) {
+      return NextResponse.json(
+        { error: "Der Speicherplatz für Belegfotos ist aufgebraucht. Bitte alte Belege löschen." },
+        { status: 413 }
+      );
+    }
 
     if (!fs.existsSync(userDir)) {
       fs.mkdirSync(userDir, { recursive: true });

@@ -81,6 +81,20 @@ function parseList(value: string | undefined): string[] | undefined {
   return list.length > 0 ? list : undefined;
 }
 
+const DEFAULT_IP_ADDRESS_HEADERS = ["x-forwarded-for", "x-real-ip"];
+
+/**
+ * Header für die Client-IP aus IP_ADDRESS_HEADERS.
+ * Nicht gesetzt: Standard-Header eines Reverse Proxys.
+ * Gesetzt, aber leer: keinem Header vertrauen (direkter Zugriff ohne Proxy,
+ * sonst ließe sich über X-Forwarded-For jede IP vortäuschen). Das Rate-Limit
+ * nutzt dann einen gemeinsamen Zähler je Endpunkt.
+ */
+export function resolveIpAddressHeaders(value: string | undefined): string[] {
+  if (value === undefined) return [...DEFAULT_IP_ADDRESS_HEADERS];
+  return parseList(value) ?? [];
+}
+
 /**
  * Prüft, ob bereits mindestens ein Benutzer in der Datenbank existiert.
  * Falls 0 Benutzer existieren, wird der erste registrierte Benutzer automatisch Admin.
@@ -178,10 +192,7 @@ export const auth = betterAuth({
   },
   advanced: {
     ipAddress: {
-      ipAddressHeaders: parseList(process.env.IP_ADDRESS_HEADERS) ?? [
-        "x-forwarded-for",
-        "x-real-ip",
-      ],
+      ipAddressHeaders: resolveIpAddressHeaders(process.env.IP_ADDRESS_HEADERS),
       trustedProxies: parseList(process.env.TRUSTED_PROXIES),
     },
     useSecureCookies: process.env.NODE_ENV === "production" && (process.env.APP_URL?.startsWith("https://") ?? false),

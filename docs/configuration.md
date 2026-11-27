@@ -19,8 +19,9 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt, am einfachsten in ei
 | `BANK_SYNC_INTERVAL_MINUTES` | Intervall des Hintergrund-Syncs | `360` |
 | `BANK_SYNC_MAX_UNATTENDED_PER_DAY` | Maximale automatische Abrufe pro Konto und Tag (höchstens 4) | `4` |
 | `RATE_LIMIT_ENABLED` | IP-basiertes Rate-Limit für Anmeldung, 2FA und Passwortänderung (in der Datenbank gespeichert). In Produktion standardmäßig aktiv, `false` schaltet es ab | *(auto)* |
-| `IP_ADDRESS_HEADERS` | Header, aus denen die Client-IP gelesen wird (kommagetrennt). Hinter Cloudflare z. B. `cf-connecting-ip` | `x-forwarded-for,x-real-ip` |
+| `IP_ADDRESS_HEADERS` | Header, aus denen die Client-IP gelesen wird (kommagetrennt). Hinter Cloudflare z. B. `cf-connecting-ip`. **Gesetzt, aber leer** (`IP_ADDRESS_HEADERS=`): keinem Header vertrauen – richtig bei direktem Zugriff ohne Reverse Proxy; das Rate-Limit zählt dann gemeinsam je Endpunkt | `x-forwarded-for,x-real-ip` |
 | `TRUSTED_PROXIES` | IPs/CIDR deines Reverse-Proxys, damit weitergereichte IP-Ketten korrekt ausgewertet werden | *(leer)* |
+| `RECEIPTS_QUOTA_MB` | Speicherkontingent für Belegfotos je Benutzer in MB (`0` = unbegrenzt) | `500` |
 | `AUTO_BACKUP_ENABLED` | Automatische Datenbank-Sicherungen (`false` schaltet sie ab) | `true` |
 | `BACKUP_INTERVAL_HOURS` | Abstand zwischen automatischen Sicherungen | `24` |
 | `BACKUP_RETENTION_COUNT` | Anzahl aufbewahrter Sicherungen | `14` |

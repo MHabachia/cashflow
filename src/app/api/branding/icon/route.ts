@@ -7,8 +7,11 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
+import { checkDeclaredUploadSize } from "@/lib/upload-limits";
 
 export const dynamic = "force-dynamic";
+
+const MAX_ICON_BYTES = 10 * 1024 * 1024;
 
 function buildDynamicSvgIcon(
   size: number,
@@ -105,6 +108,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await requireAdmin();
+    const sizeProblem = checkDeclaredUploadSize(req.headers, MAX_ICON_BYTES);
+    if (sizeProblem) {
+      return NextResponse.json({ error: sizeProblem.error }, { status: sizeProblem.status });
+    }
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -113,6 +120,9 @@ export async function POST(req: NextRequest) {
         { error: "Bitte eine gültige Bilddatei wählen." },
         { status: 400 }
       );
+    }
+    if (file.size > MAX_ICON_BYTES) {
+      return NextResponse.json({ error: "Das Logo darf maximal 10 MB groß sein." }, { status: 413 });
     }
 
     const arrayBuffer = await file.arrayBuffer();

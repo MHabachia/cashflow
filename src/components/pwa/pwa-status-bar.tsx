@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
+  claimLocalDataFor,
   getOfflineQueue,
   removeOfflineTransactionFromQueue,
 } from "@/lib/offline-queue";
@@ -11,7 +12,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { SwUpdateNotifier } from "./sw-update-notifier";
 
-export function PwaStatusBar() {
+export function PwaStatusBar({ userId }: { userId: string }) {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
   const [queueCount, setQueueCount] = useState(0);
@@ -68,11 +69,14 @@ export function PwaStatusBar() {
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
-    refreshQueueCount().then((q) => {
-      if (navigator.onLine && q.length > 0) {
-        syncOfflineQueue();
-      }
-    });
+    // Erst klären, wem die lokalen Daten gehören, dann die Queue übertragen
+    claimLocalDataFor(userId)
+      .then(() => refreshQueueCount())
+      .then((q) => {
+        if (navigator.onLine && q.length > 0) {
+          syncOfflineQueue();
+        }
+      });
 
     const handleOnline = () => {
       setIsOnline(true);
@@ -123,7 +127,7 @@ export function PwaStatusBar() {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("offline-queue-updated", handleQueueUpdate);
     };
-  }, [refreshQueueCount, syncOfflineQueue]);
+  }, [refreshQueueCount, syncOfflineQueue, userId]);
 
   return (
     <div className="space-y-2">
