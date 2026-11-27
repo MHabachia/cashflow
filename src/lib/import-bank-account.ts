@@ -15,7 +15,8 @@ function containsIgnoreCase(column: SQLWrapper, needle: string) {
 
 function searchNeedle(bankName: string, bankKey: string): string {
   if (bankKey === "advanzia") return "advanzia";
-  if (bankKey === "tfbank") return "tf";
+  // "tf" allein träfe jedes Konto, dessen Name die Buchstabenfolge enthält
+  if (bankKey === "tfbank") return "tf bank";
   return bankName.trim().toLowerCase();
 }
 

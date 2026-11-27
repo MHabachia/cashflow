@@ -40,21 +40,53 @@ describe("Gesperrte Benutzer erhalten keine Sitzung", () => {
     assert.equal(isUserBanned("unbekannt"), false);
   });
 
-  it("der Session-Hook verweigert Sitzungen nur für gesperrte Benutzer", async () => {
+  it("Better Auth verweigert gesperrten Benutzern die Anmeldung mit 403", async () => {
     const { auth } = await import("../../src/lib/auth");
-    const before = auth.options.databaseHooks?.session?.create?.before;
-    assert.ok(before, "session.create.before-Hook fehlt");
+    const { runWithSignUpAllowed } = await import("../../src/lib/signup-guard");
+    const { db } = await import("../../src/lib/db/index");
+    const { user } = await import("../../src/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
 
-    const sessionData = (userId: string) => ({
-      id: "s",
-      userId,
-      token: "t",
-      expiresAt: new Date(Date.now() + 60_000),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    assert.equal(await before(sessionData(bannedUserId)), false);
-    assert.notEqual(await before(sessionData(activeUserId)), false);
+    const email = "signin-ban@kosten.local";
+    const password = "ein-langes-test-passwort";
+    await runWithSignUpAllowed(() =>
+      auth.api.signUpEmail({ body: { email, password, name: "Sign-in Test" } })
+    );
+
+    // Direkt über die Better-Auth-API, also ohne die Vorprüfung der Route:
+    // Nur der Session-Hook kann die Anmeldung hier verhindern.
+    db.update(user).set({ banned: true }).where(eq(user.email, email)).run();
+    await assert.rejects(
+      auth.api.signInEmail({ body: { email, password } }),
+      (err: { statusCode?: number; message?: string }) =>
+        err.statusCode === 403 && /gesperrt/.test(err.message ?? "")
+    );
+
+    db.update(user).set({ banned: false }).where(eq(user.email, email)).run();
+    const ok = await auth.api.signInEmail({ body: { email, password } });
+    assert.ok(ok.token);
+  });
+
+  it("entfernt eine Sitzung, die trotz Sperre entstanden ist", async () => {
+    const { auth } = await import("../../src/lib/auth");
+    const { db } = await import("../../src/lib/db/index");
+    const { session } = await import("../../src/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const after = auth.options.databaseHooks?.session?.create?.after;
+    assert.ok(after, "session.create.after-Hook fehlt");
+
+    const now = new Date();
+    const row = {
+      id: "race-session",
+      userId: bannedUserId,
+      token: "race-token",
+      expiresAt: new Date(now.getTime() + 60_000),
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.insert(session).values(row).run();
+    await after(row);
+    assert.equal(db.select().from(session).where(eq(session.id, row.id)).get(), undefined);
   });
 
   it("getCurrentSession liefert für gesperrte Benutzer null", async () => {
