@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGlobalAppSettings } from "@/lib/settings";
 import { requireAdmin } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { db } from "@/lib/db";
 import { appSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -12,6 +13,30 @@ import { checkDeclaredUploadSize } from "@/lib/upload-limits";
 export const dynamic = "force-dynamic";
 
 const MAX_ICON_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Fertig gerenderte Icons. Der Endpunkt ist ohne Anmeldung erreichbar; ohne
+ * Cache ließe sich sharp mit Dauerabrufen auslasten. Der Schlüssel enthält
+ * Logo und Farbe, ein neues Branding erzeugt also automatisch neue Einträge.
+ */
+const iconCache = new Map<string, Buffer>();
+const MAX_CACHED_ICONS = 100;
+
+function cacheIcon(key: string, png: Buffer): Buffer {
+  if (iconCache.size >= MAX_CACHED_ICONS) iconCache.clear();
+  iconCache.set(key, png);
+  return png;
+}
+
+function pngResponse(png: Buffer): NextResponse {
+  return new NextResponse(new Uint8Array(png), {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "no-cache, must-revalidate",
+    },
+  });
+}
 
 function buildDynamicSvgIcon(
   size: number,
@@ -63,6 +88,10 @@ export async function GET(req: NextRequest) {
   const maskable = req.nextUrl.searchParams.get("maskable") === "1";
 
   const uploadsRoot = path.resolve(process.env.UPLOADS_DIR || "./data/uploads");
+  const primaryColor = settings.primaryColor || "#2563eb";
+  const cacheKey = `${settings.customLogoPath ?? ""}|${primaryColor}|${size}|${maskable ? 1 : 0}`;
+  const cached = iconCache.get(cacheKey);
+  if (cached) return pngResponse(cached);
 
   if (settings.customLogoPath) {
     const customFile = path.join(
@@ -75,31 +104,13 @@ export async function GET(req: NextRequest) {
         .resize(size, size, { fit: "cover" })
         .png()
         .toBuffer();
-
-      return new NextResponse(new Uint8Array(pngBuffer), {
-        status: 200,
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control": "no-cache, must-revalidate",
-        },
-      });
+      return pngResponse(cacheIcon(cacheKey, pngBuffer));
     }
   }
 
-  const svg = buildDynamicSvgIcon(
-    size,
-    settings.primaryColor || "#2563eb",
-    maskable
-  );
+  const svg = buildDynamicSvgIcon(size, primaryColor, maskable);
   const pngBuffer = await sharp(svg).png().toBuffer();
-
-  return new NextResponse(new Uint8Array(pngBuffer), {
-    status: 200,
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": "no-cache, must-revalidate",
-    },
-  });
+  return pngResponse(cacheIcon(cacheKey, pngBuffer));
 }
 
 /**
@@ -169,8 +180,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       {
-        error:
-          err instanceof Error ? err.message : "Upload fehlgeschlagen.",
+        error: publicErrorMessage(err, "Upload fehlgeschlagen.", "api/branding/icon"),
       },
       { status: 500 }
     );

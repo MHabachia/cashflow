@@ -8,6 +8,7 @@ import {
   INTERVALS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsCategory } from "@/lib/ownership";
 import { firstIssueMessage, idSchema, positiveCentsSchema } from "@/lib/validation";
 import { processDueRecurringExpenses } from "@/lib/recurring-processor";
@@ -131,7 +132,7 @@ export async function toggleRecurringActiveAction(id: string, active: boolean) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Status konnte nicht geändert werden.",
+      error: publicErrorMessage(err, "Status konnte nicht geändert werden.", "recurring-actions"),
     };
   }
 }
@@ -180,7 +181,7 @@ export async function bookRecurringNowAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Buchung fehlgeschlagen.",
+      error: publicErrorMessage(err, "Buchung fehlgeschlagen.", "recurring-actions"),
     };
   }
 }
@@ -201,7 +202,7 @@ export async function deleteRecurringExpenseAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Löschen fehlgeschlagen.",
+      error: publicErrorMessage(err, "Löschen fehlgeschlagen.", "recurring-actions"),
     };
   }
 }
@@ -300,7 +301,7 @@ export async function createRecurringFromTransactionAction(rawParams: {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Fixkosten konnten nicht angelegt werden.",
+      error: publicErrorMessage(err, "Fixkosten konnten nicht angelegt werden.", "recurring-actions"),
     };
   }
 }

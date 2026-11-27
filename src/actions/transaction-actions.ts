@@ -10,6 +10,7 @@ import {
   PAYMENT_METHODS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsAllCategories, userOwnsCategory } from "@/lib/ownership";
 import { firstIssueMessage, idListSchema, idSchema } from "@/lib/validation";
 import { and, eq, sql } from "drizzle-orm";
@@ -416,7 +417,7 @@ export async function batchUpdateTransactionsAction(rawInput: {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Fehler bei der Massenaktualisierung.",
+      error: publicErrorMessage(err, "Fehler bei der Massenaktualisierung.", "transaction-actions"),
     };
   }
 }
@@ -447,7 +448,7 @@ export async function batchDeleteTransactionsAction(rawIds: string[]) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Fehler beim Löschen der Buchungen.",
+      error: publicErrorMessage(err, "Fehler beim Löschen der Buchungen.", "transaction-actions"),
     };
   }
 }
@@ -578,7 +579,7 @@ export async function findDuplicateTransactionsAction() {
       success: false,
       groups: [],
       totalDuplicates: 0,
-      error: (err as Error)?.message || "Fehler beim Suchen von Duplikaten.",
+      error: publicErrorMessage(err, "Fehler beim Suchen von Duplikaten.", "transaction-actions"),
     };
   }
 }

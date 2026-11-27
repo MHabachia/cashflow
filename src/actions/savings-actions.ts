@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { savingsGoals, type SavingsGoal } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { and, eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -86,7 +87,7 @@ export async function createSavingsGoalAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Sparziel konnte nicht erstellt werden.",
+      error: publicErrorMessage(err, "Sparziel konnte nicht erstellt werden.", "savings-actions"),
     };
   }
 }
@@ -133,7 +134,7 @@ export async function adjustSavingsGoalAmountAction(rawParams: {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Betrag konnte nicht angepasst werden.",
+      error: publicErrorMessage(err, "Betrag konnte nicht angepasst werden.", "savings-actions"),
     };
   }
 }
@@ -199,7 +200,7 @@ export async function updateSavingsGoalAction(rawParams: {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Sparziel konnte nicht aktualisiert werden.",
+      error: publicErrorMessage(err, "Sparziel konnte nicht aktualisiert werden.", "savings-actions"),
     };
   }
 }
@@ -217,7 +218,7 @@ export async function deleteSavingsGoalAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Sparziel konnte nicht gelöscht werden.",
+      error: publicErrorMessage(err, "Sparziel konnte nicht gelöscht werden.", "savings-actions"),
     };
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   saveRecurringExpenseAction,
@@ -89,6 +89,24 @@ export function FixedCostsView({
   categories: CategoryItem[];
 }) {
   const [showForm, setShowForm] = useState(false);
+  // Schutz gegen Doppelklick: Ref statt State, damit ein zweiter Klick im
+  // selben Render-Durchlauf schon blockiert ist
+  const bookingInFlight = useRef(new Set<string>());
+  const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
+
+  async function bookNow(itemId: string, successMessage: string, errorMessage: string) {
+    if (bookingInFlight.current.has(itemId)) return;
+    bookingInFlight.current.add(itemId);
+    setBookingIds(new Set(bookingInFlight.current));
+    try {
+      const res = await bookRecurringNowAction(itemId);
+      if (res.success) toast.success(successMessage);
+      else toast.error(res.error || errorMessage);
+    } finally {
+      bookingInFlight.current.delete(itemId);
+      setBookingIds(new Set(bookingInFlight.current));
+    }
+  }
   const [editId, setEditId] = useState<string | undefined>(undefined);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -654,14 +672,14 @@ export function FixedCostsView({
 
                     <button
                       type="button"
-                      onClick={async () => {
-                        const res = await bookRecurringNowAction(item.id);
-                        if (res.success) {
-                          toast.success(`„${item.name}“ jetzt als Einnahme verbucht!`);
-                        } else {
-                          toast.error(res.error || "Fehler beim Einbuchen der Einnahme.");
-                        }
-                      }}
+                      disabled={bookingIds.has(item.id)}
+                      onClick={() =>
+                        bookNow(
+                          item.id,
+                          `„${item.name}“ jetzt als Einnahme verbucht!`,
+                          "Fehler beim Einbuchen der Einnahme."
+                        )
+                      }
                       title="Jetzt sofort einmalig als Einnahme einbuchen"
                       className="px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-500/20"
                     >
@@ -825,14 +843,14 @@ export function FixedCostsView({
 
                     <button
                       type="button"
-                      onClick={async () => {
-                        const res = await bookRecurringNowAction(item.id);
-                        if (res.success) {
-                          toast.success(`„${item.name}“ jetzt als Ausgabe gebucht!`);
-                        } else {
-                          toast.error(res.error || "Fehler beim Abbuchen der Fixkosten.");
-                        }
-                      }}
+                      disabled={bookingIds.has(item.id)}
+                      onClick={() =>
+                        bookNow(
+                          item.id,
+                          `„${item.name}“ jetzt als Ausgabe gebucht!`,
+                          "Fehler beim Abbuchen der Fixkosten."
+                        )
+                      }
                       title="Jetzt sofort einmalig abbuchen"
                       className="px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-indigo-500/20"
                     >

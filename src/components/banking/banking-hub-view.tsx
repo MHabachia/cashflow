@@ -46,6 +46,7 @@ import {
   Scale,
 } from "lucide-react";
 import { toast } from "sonner";
+import { bankErrorMessage } from "@/lib/bank-error-codes";
 import { cn } from "@/lib/utils";
 import {
   CreateRecurringModal,
@@ -145,22 +146,13 @@ export function BankingHubView({
       toast.success("Bank verbunden.");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("bank_error")) {
-      const err = params.get("bank_error");
-      if (err === "csrf") {
-        toast.error(
-          "Sicherheitsprüfung fehlgeschlagen (CSRF/Sitzungsablauf). Bitte erneut versuchen."
-        );
-      } else if (
-        err?.includes("REDIRECT_URI_NOT_ALLOWED") ||
-        err?.includes("Redirect URI not allowed")
-      ) {
-        toast.error(
-          "Redirect URI nicht erlaubt: Bitte trage die Callback-URL in deiner Enable Banking Application unter Redirect URLs ein.",
-          { duration: 8000 }
-        );
+      // Nur feste Codes aus der URL übersetzen, nie Freitext anzeigen
+      const code = params.get("bank_error") ?? "";
+      if (code === "redirect_uri_not_allowed") {
+        toast.error(bankErrorMessage(code), { duration: 8000 });
         setLiveInfoOpen(true);
       } else {
-        toast.error(`Bankverbindung fehlgeschlagen: ${err}`, { duration: 6000 });
+        toast.error(bankErrorMessage(code), { duration: 6000 });
       }
       window.history.replaceState({}, "", window.location.pathname);
     }

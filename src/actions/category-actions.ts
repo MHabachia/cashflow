@@ -8,6 +8,7 @@ import {
   PAYMENT_METHODS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsCategory, wouldCreateCategoryCycle } from "@/lib/ownership";
 import { and, eq, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -150,7 +151,7 @@ export async function deleteOrArchiveCategoryAction(id: string) {
     return {
       success: false,
       archived: false,
-      error: (err as Error)?.message || "Kategorie konnte nicht gelöscht werden.",
+      error: publicErrorMessage(err, "Kategorie konnte nicht gelöscht werden.", "category-actions"),
     };
   }
 }
@@ -242,7 +243,7 @@ export async function deleteVariablePresetAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Vorlage konnte nicht gelöscht werden.",
+      error: publicErrorMessage(err, "Vorlage konnte nicht gelöscht werden.", "category-actions"),
     };
   }
 }

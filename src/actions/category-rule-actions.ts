@@ -9,6 +9,7 @@ import {
   MATCH_FIELDS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsCategory } from "@/lib/ownership";
 import { and, eq, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -109,7 +110,7 @@ export async function createCategoryRuleAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Regel konnte nicht erstellt werden.",
+      error: publicErrorMessage(err, "Regel konnte nicht erstellt werden.", "category-rule-actions"),
     };
   }
 }
@@ -163,7 +164,7 @@ export async function updateCategoryRuleAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Regel konnte nicht aktualisiert werden.",
+      error: publicErrorMessage(err, "Regel konnte nicht aktualisiert werden.", "category-rule-actions"),
     };
   }
 }
@@ -182,7 +183,7 @@ export async function deleteCategoryRuleAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Regel konnte nicht gelöscht werden.",
+      error: publicErrorMessage(err, "Regel konnte nicht gelöscht werden.", "category-rule-actions"),
     };
   }
 }
@@ -214,7 +215,7 @@ export async function toggleCategoryRuleActiveAction(id: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Status konnte nicht geändert werden.",
+      error: publicErrorMessage(err, "Status konnte nicht geändert werden.", "category-rule-actions"),
     };
   }
 }
@@ -236,7 +237,7 @@ export async function toggleAllCategoryRulesAction(active: boolean) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Regeln konnten nicht umgeschaltet werden.",
+      error: publicErrorMessage(err, "Regeln konnten nicht umgeschaltet werden.", "category-rule-actions"),
     };
   }
 }
@@ -254,7 +255,7 @@ export async function deleteAllCategoryRulesAction() {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Regeln konnten nicht gelöscht werden.",
+      error: publicErrorMessage(err, "Regeln konnten nicht gelöscht werden.", "category-rule-actions"),
     };
   }
 }
@@ -343,7 +344,7 @@ export async function seedDefaultCategoryRulesAction(targetUserId?: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Fehler beim Aktivieren der Standard-Regeln.",
+      error: publicErrorMessage(err, "Fehler beim Aktivieren der Standard-Regeln.", "category-rule-actions"),
     };
   }
 }
@@ -459,7 +460,7 @@ export async function applyCategoryRulesAction(options?: ApplyCategoryRulesOptio
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Fehler beim Anwenden der Regeln.",
+      error: publicErrorMessage(err, "Fehler beim Anwenden der Regeln.", "category-rule-actions"),
     };
   }
 }

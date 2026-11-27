@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { getGlobalAppSettings } from "@/lib/settings";
 import sharp from "sharp";
 import fs from "node:fs";
@@ -123,10 +124,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Fehler bei der Bildkomprimierung.",
+        error: publicErrorMessage(err, "Fehler bei der Bildkomprimierung.", "api/receipts/upload"),
       },
       { status: 500 }
     );

@@ -18,6 +18,7 @@ import {
   getCurrentSession,
   revokeOtherUserSessions,
 } from "@/lib/session";
+import { publicErrorMessage, UserFacingError } from "@/lib/errors";
 import { eq, and, isNull, gt, ne } from "drizzle-orm";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -214,7 +215,7 @@ export async function registerUserAction(formData: {
     );
 
     if (!res?.user?.id) {
-      throw new Error("Registrierung fehlgeschlagen.");
+      throw new UserFacingError("Registrierung fehlgeschlagen.");
     }
 
     if (validInviteId) {
@@ -245,10 +246,11 @@ export async function registerUserAction(formData: {
     }
     return {
       success: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Registrierung fehlgeschlagen. Möglicherweise existiert die E-Mail bereits.",
+      error: publicErrorMessage(
+        err,
+        "Registrierung fehlgeschlagen. Möglicherweise existiert die E-Mail bereits.",
+        "auth-actions"
+      ),
     };
   }
 }
@@ -328,10 +330,11 @@ export async function changeOwnPasswordAction(input: {
   } catch (err) {
     return {
       success: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Passwort konnte nicht geändert werden. Bitte aktuelles Passwort prüfen.",
+      error: publicErrorMessage(
+        err,
+        "Passwort konnte nicht geändert werden. Bitte aktuelles Passwort prüfen.",
+        "auth-actions"
+      ),
     };
   }
 }

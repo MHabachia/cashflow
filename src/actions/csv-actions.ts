@@ -10,6 +10,7 @@ import {
   type PaymentMethod,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { parseEuroToCents, todayISO } from "@/lib/format";
 import { findMatchingRule } from "@/lib/category-rules";
 import { detectOwnAccountTransfers } from "@/lib/transfer-detection";
@@ -496,12 +497,13 @@ export async function importStatementFileAction(
         format: "pdf",
       };
     } catch (err: unknown) {
-      console.error("PDF Parse Error:", err);
       return {
         success: false,
-        error:
-          "Fehler beim Verarbeiten des PDF-Kontoauszugs: " +
-          (err instanceof Error ? err.message : String(err)),
+        error: publicErrorMessage(
+          err,
+          "Der PDF-Kontoauszug konnte nicht verarbeitet werden.",
+          "csv-actions:pdf"
+        ),
         format: "pdf",
       };
     }
@@ -562,9 +564,11 @@ export async function importStatementFileAction(
     } catch (err) {
       return {
         success: false,
-        error:
-          "Fehler beim Verarbeiten der CAMT-Datei: " +
-          (err instanceof Error ? err.message : String(err)),
+        error: publicErrorMessage(
+          err,
+          "Die CAMT-Datei konnte nicht verarbeitet werden.",
+          "csv-actions:camt"
+        ),
         format: "camt",
       };
     }

@@ -11,6 +11,7 @@ import {
   PAYMENT_METHODS,
 } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { runWithSignUpAllowed } from "@/lib/signup-guard";
 import { logAudit } from "@/lib/audit";
 import { headers } from "next/headers";
@@ -95,10 +96,7 @@ export async function adminCreateUserAction(
   } catch (err) {
     return {
       success: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Benutzer konnte nicht erstellt werden.",
+      error: publicErrorMessage(err, "Benutzer konnte nicht erstellt werden.", "admin-actions"),
     };
   }
 }
@@ -366,7 +364,7 @@ export async function createBackupNowAction() {
     revalidatePath("/admin");
     return { success: true, name };
   } catch (err) {
-    return { success: false, error: (err as Error)?.message || "Sicherung fehlgeschlagen." };
+    return { success: false, error: publicErrorMessage(err, "Sicherung fehlgeschlagen.", "admin-actions") };
   }
 }
 
@@ -379,6 +377,6 @@ export async function verifyBackupAction(name: string) {
     logAudit({ action: "admin.backup.verify", actorId: admin.id, target: `${name}: ${result.ok ? "ok" : "fehlerhaft"}` });
     return { success: true as const, result };
   } catch (err) {
-    return { success: false as const, error: (err as Error)?.message || "Prüfung fehlgeschlagen." };
+    return { success: false as const, error: publicErrorMessage(err, "Prüfung fehlgeschlagen.", "admin-actions") };
   }
 }

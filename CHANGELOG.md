@@ -23,6 +23,14 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Das Rate-Limit für Passwort-Reset und Wiederherstellungscodes ermittelt die Client-IP nach denselben Regeln wie die Anmeldung (`IP_ADDRESS_HEADERS`, `TRUSTED_PROXIES`) statt jedem `X-Forwarded-For`-Header zu glauben.
 - Zwischengespeicherte Finanzdaten (Seiten-Cache des Service Workers, letzte Buchungen) werden auch auf der Anmeldeseite entfernt, also nach Ablauf der Sitzung. Meldet sich ein anderer Benutzer am selben Gerät an, werden alle lokalen Daten einschließlich der Offline-Queue verworfen, bevor etwas übertragen wird.
 - Uploads (Belege, Profilbild, Logo) werden anhand der angekündigten Größe abgelehnt, bevor sie in den Speicher gelesen werden. Belegfotos haben ein Kontingent je Benutzer (`RECEIPTS_QUOTA_MB`, Standard 500 MB).
+- Fehlermeldungen an die Oberfläche enthalten keine internen Details mehr (SQLite, Bildverarbeitung, Antworten der Bank-API). Durchgereicht werden nur bewusst für Nutzer formulierte Meldungen; alles andere landet im Server-Log. Weiterleitungen auf die Anmeldeseite gehen in Actions nicht mehr als Fehlermeldung „NEXT_REDIRECT“ verloren.
+- `?bank_error=` enthält nur noch feste Codes. Vorher stand dort der Fehlertext der Bank-API, und über einen präparierten Link ließ sich ein beliebiger Text als Meldung der App anzeigen.
+- CSV-Export: Formeln werden auch nach führenden Leerzeichen entschärft, Zeilenumbrüche vereinheitlicht und Steuerzeichen entfernt.
+- Umbuchungen buchen bei wiederholter Anfrage nicht doppelt; „Buchen“/„Einbuchen“ bei Fixkosten ist gegen Doppelklick geschützt.
+- Neue Wiederherstellungscodes erfordern bei Konten ohne Passwort (nur Passkey) eine frische Anmeldung (höchstens 10 Minuten alt).
+- Profilbilder werden nur dem eigenen Benutzer und Admins ausgeliefert.
+- Der Download einer Sicherung legt die Kopie in einem nur für den Prozess lesbaren Verzeichnis an, entfernt sie in jedem Fall und wird nicht zwischengespeichert (`Cache-Control: no-store`).
+- Das öffentliche App-Icon wird zwischengespeichert statt bei jedem Abruf neu gerendert.
 
 ## [1.2.1] – 2026-11-26
 
