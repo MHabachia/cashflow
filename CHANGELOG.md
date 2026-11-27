@@ -19,6 +19,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Eine Elternkategorie, die einen Kreis in der Hierarchie erzeugen würde (A → B → A), wird abgelehnt.
 - Server Actions für Konten, Umbuchungen, Saldo-Abgleich, Sparziele, Massenaktionen und Fixkosten prüfen ihre Eingaben mit zod: Beträge nur als ganze Cent mit Obergrenze, nur echte Kalenderdaten, bekannte Kontoarten und Intervalle, begrenzte Textlängen. Vorher ließ sich z. B. ein String als Betrag übergeben, der per String-Verkettung im Saldo landete.
 - Regeln für Server Actions festgehalten in `docs/adr/0001-server-action-vertrag.md`.
+- `IP_ADDRESS_HEADERS=` (gesetzt, aber leer) vertraut wie dokumentiert keinem Header mehr. Vorher galt dann still der Standard `x-forwarded-for`, und über einen gefälschten Header ließ sich das Rate-Limit umgehen.
+- Das Rate-Limit für Passwort-Reset und Wiederherstellungscodes ermittelt die Client-IP nach denselben Regeln wie die Anmeldung (`IP_ADDRESS_HEADERS`, `TRUSTED_PROXIES`) statt jedem `X-Forwarded-For`-Header zu glauben.
+- Zwischengespeicherte Finanzdaten (Seiten-Cache des Service Workers, letzte Buchungen) werden auch auf der Anmeldeseite entfernt, also nach Ablauf der Sitzung. Meldet sich ein anderer Benutzer am selben Gerät an, werden alle lokalen Daten einschließlich der Offline-Queue verworfen, bevor etwas übertragen wird.
+- Uploads (Belege, Profilbild, Logo) werden anhand der angekündigten Größe abgelehnt, bevor sie in den Speicher gelesen werden. Belegfotos haben ein Kontingent je Benutzer (`RECEIPTS_QUOTA_MB`, Standard 500 MB).
 
 ## [1.2.1] – 2026-11-26
 

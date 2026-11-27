@@ -79,6 +79,46 @@ export async function getRecentTransactionsSnapshot(): Promise<
 }
 
 
+const LOCAL_DATA_OWNER_KEY = "kosten_local_data_owner_v1";
+
+/**
+ * Entfernt angezeigte Finanzdaten aus dem Browser: Umsatz-Snapshot (IndexedDB)
+ * und die Laufzeit-Caches des Service Workers (Seiten, RSC-Payloads).
+ * Die Offline-Queue bleibt erhalten: Läuft nur die Sitzung ab, sollen noch
+ * nicht übertragene Buchungen nach der erneuten Anmeldung nicht verloren gehen.
+ * Wem sie gehören, klärt `claimLocalDataFor` nach der Anmeldung.
+ */
+export async function clearCachedFinancialData(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    await del(OFFLINE_RECENT_TX_KEY);
+  } catch {
+    // IndexedDB nicht verfügbar
+  }
+  await clearRuntimeCaches();
+}
+
+/**
+ * Bindet die lokalen Daten an den angemeldeten Benutzer. Gehören sie einem
+ * anderen Benutzer (Nutzerwechsel am selben Gerät), werden sie vollständig
+ * entfernt, bevor die Offline-Queue übertragen wird. So landen weder fremde
+ * Offline-Buchungen im eigenen Konto noch fremde Seiten im Cache.
+ * Ohne gespeicherten Besitzer (Daten aus älteren Versionen) übernimmt der
+ * aktuelle Benutzer die Daten, damit keine Offline-Buchungen verloren gehen.
+ */
+export async function claimLocalDataFor(userId: string): Promise<void> {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    const owner = await get<string>(LOCAL_DATA_OWNER_KEY);
+    if (owner && owner !== userId) {
+      await clearLocalUserData();
+    }
+    await set(LOCAL_DATA_OWNER_KEY, userId);
+  } catch {
+    // IndexedDB nicht verfügbar: dann gibt es auch keine lokalen Daten
+  }
+}
+
 /**
  * Entfernt beim Abmelden alle lokal zwischengespeicherten Finanzdaten:
  * Offline-Queue, Umsatz-Snapshot (IndexedDB) und die Laufzeit-Caches des
@@ -88,10 +128,19 @@ export async function getRecentTransactionsSnapshot(): Promise<
 export async function clearLocalUserData(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    await Promise.all([del(OFFLINE_QUEUE_KEY), del(OFFLINE_RECENT_TX_KEY)]);
+    await Promise.all([
+      del(OFFLINE_QUEUE_KEY),
+      del(OFFLINE_RECENT_TX_KEY),
+      del(LOCAL_DATA_OWNER_KEY),
+    ]);
   } catch {
     // IndexedDB nicht verfügbar
   }
+  await clearRuntimeCaches();
+  window.dispatchEvent(new CustomEvent("offline-queue-updated"));
+}
+
+async function clearRuntimeCaches(): Promise<void> {
   try {
     if ("caches" in window) {
       const names = await caches.keys();
@@ -104,5 +153,4 @@ export async function clearLocalUserData(): Promise<void> {
   } catch {
     // Cache Storage nicht verfügbar
   }
-  window.dispatchEvent(new CustomEvent("offline-queue-updated"));
 }

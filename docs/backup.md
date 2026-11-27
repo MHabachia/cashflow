@@ -44,3 +44,5 @@ docker compose start
 Der Container setzt die Dateirechte beim Start selbst.
 
 **Secret:** Wurde `.auth-secret` automatisch erzeugt, gehört es zur Datenbank. Ohne das passende Secret sind alle Sitzungen ungültig und, falls kein eigener `TOKEN_ENCRYPTION_KEY` gesetzt war, auch die gespeicherten Bankzugänge. Zurückkopieren mit `cp backups/auth-secret_<Zeitstempel> data/.auth-secret`.
+
+**Schutz der Sicherungen:** Liegen Datenbank und `.auth-secret` zusammen in einer Kopie von `data/` oder `backups/`, kann jeder mit dieser Kopie die gespeicherten Bankzugänge entschlüsseln. Deshalb: einen eigenen `TOKEN_ENCRYPTION_KEY` setzen und außerhalb von `data/` aufbewahren (z. B. in der `.env` oder einem Passwortmanager) und Sicherungen so geschützt ablegen wie Passwörter.

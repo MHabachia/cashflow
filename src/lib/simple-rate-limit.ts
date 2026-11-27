@@ -1,3 +1,6 @@
+import { getIP } from "better-auth/api";
+import { auth } from "./auth";
+
 /**
  * Einfaches Rate-Limit im Speicher für Server-Actions, die nicht über die
  * Better-Auth-Endpunkte laufen (z. B. Passwort-Wiederherstellung).
@@ -22,11 +25,15 @@ export function hitRateLimit(key: string, max: number, windowMs: number): { allo
   };
 }
 
+/** Schlüssel, wenn sich keine vertrauenswürdige Client-IP ermitteln lässt. */
+export const NO_TRUSTED_IP_KEY = "no-trusted-ip";
+
+/**
+ * Client-IP nach denselben Regeln wie das Rate-Limit von Better Auth:
+ * nur Header aus IP_ADDRESS_HEADERS, mehrteilige X-Forwarded-For-Ketten nur
+ * mit TRUSTED_PROXIES. Ohne vertrauenswürdige IP teilen sich alle Anfragen
+ * einen Zähler, statt dass ein gefälschter Header einen neuen erzeugt.
+ */
 export function clientKeyFromHeaders(headers: Headers): string {
-  return (
-    headers.get("cf-connecting-ip") ||
-    headers.get("x-real-ip") ||
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "local"
-  );
+  return getIP(headers, auth.options) ?? NO_TRUSTED_IP_KEY;
 }

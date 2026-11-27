@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { getBrandingAction } from "@/actions/auth-actions";
+import { clearCachedFinancialData } from "@/lib/offline-queue";
 import { CashflowLogo } from "@/components/ui/cashflow-logo";
 import {
   Lock,
@@ -35,6 +36,12 @@ export default function LoginPage() {
     primaryColor: "#2563eb",
     customLogoPath: null,
   });
+
+  // Auf der Anmeldeseite ist niemand angemeldet (abgemeldet, Sitzung
+  // abgelaufen oder gesperrt): zwischengespeicherte Finanzdaten entfernen
+  useEffect(() => {
+    clearCachedFinancialData();
+  }, []);
 
   useEffect(() => {
     getBrandingAction()

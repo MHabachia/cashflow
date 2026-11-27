@@ -7,8 +7,11 @@ import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { checkDeclaredUploadSize } from "@/lib/upload-limits";
 
 export const dynamic = "force-dynamic";
+
+const MAX_AVATAR_BYTES = 10 * 1024 * 1024;
 
 const ALLOWED_IMAGE_FORMATS = new Set([
   "jpeg",
@@ -26,6 +29,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
 
+  const sizeProblem = checkDeclaredUploadSize(req.headers, MAX_AVATAR_BYTES);
+  if (sizeProblem) {
+    return NextResponse.json({ error: sizeProblem.error }, { status: sizeProblem.status });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -37,7 +45,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_AVATAR_BYTES) {
       return NextResponse.json(
         { error: "Profilbild darf maximal 10 MB groß sein." },
         { status: 400 }
