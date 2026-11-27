@@ -99,6 +99,8 @@ export default async function RootLayout({
           position="bottom-center"
           richColors
           closeButton
+          // Standard von sonner sind 4 s, zu kurz zum Lesen längerer Meldungen
+          duration={6000}
           offset={{ bottom: "24px" }}
           mobileOffset={{ bottom: "80px" }}
         />
