@@ -10,6 +10,7 @@ import {
   PAYMENT_METHODS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { userOwnsAllCategories, userOwnsCategory } from "@/lib/ownership";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -43,14 +44,6 @@ function removeReceiptFileFromDisk(
   } catch {
     // Datei bereits entfernt oder nicht erreichbar
   }
-}
-
-function userOwnsCategory(userId: string, categoryId: string): boolean {
-  return !!db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)))
-    .get();
 }
 
 const transactionSchema = z.object({
@@ -387,6 +380,9 @@ export async function batchUpdateTransactionsAction(input: {
     if (!input.ids || input.ids.length === 0) {
       return { success: false, error: "Keine Buchungen ausgewählt." };
     }
+    if (input.categoryId && !userOwnsCategory(user.id, input.categoryId)) {
+      return { success: false, error: "Ungültige Kategorie." };
+    }
 
     const payload: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -609,6 +605,10 @@ export async function splitTransactionAction(input: {
 
   const { transactionId, splits } = parsed.data;
 
+  if (!userOwnsAllCategories(user.id, splits.map((s) => s.categoryId))) {
+    return { success: false, error: "Ungültige Kategorie." };
+  }
+
   const targetTx = db
     .select()
     .from(transactions)
@@ -720,7 +720,10 @@ export async function getTransactionSplitsAction(transactionId: string) {
       description: transactionSplits.description,
     })
     .from(transactionSplits)
-    .innerJoin(categories, eq(transactionSplits.categoryId, categories.id))
+    .innerJoin(
+      categories,
+      and(eq(transactionSplits.categoryId, categories.id), eq(categories.userId, user.id))
+    )
     .where(eq(transactionSplits.transactionId, targetTx.id))
     .all();
 

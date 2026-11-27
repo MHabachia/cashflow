@@ -9,6 +9,7 @@ import {
   MATCH_FIELDS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { userOwnsCategory } from "@/lib/ownership";
 import { and, eq, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -57,7 +58,10 @@ export async function getUserCategoryRulesAction() {
       createdAt: categoryRules.createdAt,
     })
     .from(categoryRules)
-    .innerJoin(categories, eq(categoryRules.categoryId, categories.id))
+    .innerJoin(
+      categories,
+      and(eq(categoryRules.categoryId, categories.id), eq(categories.userId, user.id))
+    )
     .where(eq(categoryRules.userId, user.id))
     .orderBy(desc(categoryRules.priority), asc(categoryRules.pattern))
     .all();
@@ -77,6 +81,9 @@ export async function createCategoryRuleAction(
     }
 
     const data = parsed.data;
+    if (!userOwnsCategory(user.id, data.categoryId)) {
+      return { success: false, error: "Ungültige Kategorie." };
+    }
     const id = crypto.randomUUID();
     const now = new Date();
 
@@ -131,6 +138,9 @@ export async function updateCategoryRuleAction(
 
     if (!existing) {
       return { success: false, error: "Regel nicht gefunden." };
+    }
+    if (data.categoryId !== undefined && !userOwnsCategory(user.id, data.categoryId)) {
+      return { success: false, error: "Ungültige Kategorie." };
     }
 
     db.update(categoryRules)

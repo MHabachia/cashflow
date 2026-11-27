@@ -8,6 +8,7 @@ import {
   INTERVALS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { userOwnsCategory } from "@/lib/ownership";
 import { processDueRecurringExpenses } from "@/lib/recurring-processor";
 import { todayISO } from "@/lib/format";
 import { and, eq } from "drizzle-orm";
@@ -53,6 +54,9 @@ export async function saveRecurringExpenseAction(input: RecurringInput) {
   }
 
   const data = parsed.data;
+  if (!userOwnsCategory(user.id, data.categoryId)) {
+    return { success: false, error: "Ungültige Kategorie." };
+  }
 
   if (data.id) {
     db.update(recurringExpenses)
@@ -222,6 +226,9 @@ export async function createRecurringFromTransactionAction(params: {
     }
     if (!params.categoryId) {
       return { success: false, error: "Bitte eine Kategorie wählen." };
+    }
+    if (!userOwnsCategory(user.id, params.categoryId)) {
+      return { success: false, error: "Ungültige Kategorie." };
     }
 
     const recurringId = crypto.randomUUID();

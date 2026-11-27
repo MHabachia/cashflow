@@ -15,6 +15,8 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Gesperrte Benutzer erhalten über keinen Anmeldeweg mehr eine Sitzung, auch nicht per Passkey; sie sehen dabei den Hinweis auf die Sperre, der Versuch landet im Sicherheitsprotokoll. API-Routen (Belege, Profilbild, CSV-Export, Bank-Sync) behandeln gesperrte Benutzer als nicht angemeldet.
 - Der Import (CSV, CAMT, PDF) bucht nur noch auf eigene Konten; eine fremde Konto-ID wird abgelehnt.
 - Die Anlage von Import-Konten ist keine Server Action mehr und wertet `%` und `_` im Banknamen nicht als Platzhalter. Ein TF-Bank-Import ordnet sich nur noch Konten mit „TF Bank“ im Namen zu, nicht jedem Konto mit „tf“.
+- Kategorien aus dem Client werden auf Eigentum geprüft: Massen-Update, Split-Buchungen, Regeln, Vorlagen, Fixkosten, Budgets und Elternkategorien nehmen keine fremden Kategorien mehr an. Split- und Regel-Listen zeigen keine fremden Kategorienamen.
+- Eine Elternkategorie, die einen Kreis in der Hierarchie erzeugen würde (A → B → A), wird abgelehnt.
 
 ## [1.2.1] – 2026-11-26
 

@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { budgets } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { userOwnsCategory } from "@/lib/ownership";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -28,6 +29,9 @@ export async function saveBudgetAction(input: z.infer<typeof budgetSchema>) {
   }
 
   const { categoryId, amountCents } = parsed.data;
+  if (categoryId && !userOwnsCategory(user.id, categoryId)) {
+    return { success: false, error: "Ungültige Kategorie." };
+  }
   const now = new Date();
 
   const existing = db
