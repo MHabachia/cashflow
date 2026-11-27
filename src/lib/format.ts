@@ -33,10 +33,17 @@ export function parseEuroToCents(input: string | number): number | null {
 
   let normalized = raw;
   if (raw.includes(",") && raw.includes(".")) {
-    // Deutsches Format mit Tausenderpunkt: 1.234,56 -> 1234.56
-    normalized = raw.replace(/\./g, "").replace(",", ".");
+    // Beide Trenner: Der hintere ist der Dezimaltrenner
+    normalized =
+      raw.lastIndexOf(",") > raw.lastIndexOf(".")
+        ? raw.replace(/\./g, "").replace(",", ".") // 1.234,56 -> 1234.56
+        : raw.replace(/,/g, ""); // 1,234.56 -> 1234.56
   } else if (raw.includes(",")) {
     normalized = raw.replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    // Nur Punkte in Dreiergruppen: deutscher Tausenderpunkt ("1.500" = 1.500 €).
+    // Beträge haben höchstens zwei Nachkommastellen, "12.50" bleibt 12,50 €.
+    normalized = raw.replace(/\./g, "");
   }
 
   const parsed = Number(normalized);

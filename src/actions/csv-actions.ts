@@ -237,6 +237,14 @@ export async function importCsvTransactionsAction(
   // übersprungen, soweit sie für dieses Konto bereits gespeichert sind.
   const fileOccurrences = new Map<string, number>();
 
+  // Ohne Typ-Spalte entscheidet das Vorzeichen, sofern die Datei überhaupt
+  // Vorzeichen nutzt (Kontoauszug: "-49,99" Ausgabe, "2.500,00" Einnahme).
+  // Reine Ausgabenlisten ohne Minuszeichen bleiben wie bisher Ausgaben.
+  const isNegativeAmount = (raw: string) => raw.trim().startsWith("-");
+  const typeFromSign =
+    idxType === -1 &&
+    lines.slice(1).some((line) => isNegativeAmount(splitCsvLine(line, delimiter)[idxAmount] || ""));
+
   db.transaction((tx) => {
     for (let i = 1; i < lines.length; i++) {
       const cols = splitCsvLine(lines[i], delimiter);
@@ -252,7 +260,8 @@ export async function importCsvTransactionsAction(
         rawType.includes("gutschrift") ||
         rawType.includes("crdt");
 
-      const type: "expense" | "income" = isExplicitIncome ? "income" : "expense";
+      const type: "expense" | "income" =
+        isExplicitIncome || (typeFromSign && !isNegativeAmount(rawAmount)) ? "income" : "expense";
       const amountCents = parseEuroToCents(rawAmount.replace(/^[+-]/, ""));
       if (!amountCents) continue;
 

@@ -33,6 +33,18 @@ describe("Währungs- & Datumsformatierung (src/lib/format.ts)", () => {
     assert.equal(parseEuroToCents(19.99), 1999);
   });
 
+  it("erkennt Tausenderpunkte ohne Komma und englische Tausendertrenner", () => {
+    assert.equal(parseEuroToCents("1.500"), 150000);
+    assert.equal(parseEuroToCents("1.234.567"), 123456700);
+    assert.equal(parseEuroToCents("1.234.567,89"), 123456789);
+    assert.equal(parseEuroToCents("1,234.56"), 123456);
+    // Ein Punkt mit ein oder zwei Nachkommastellen bleibt Dezimaltrenner
+    assert.equal(parseEuroToCents("1.5"), 150);
+    assert.equal(parseEuroToCents("150.00"), 15000);
+    // Uneinheitliche Gruppen sind kein Tausenderformat
+    assert.equal(parseEuroToCents("1.50.000"), null);
+  });
+
   it("weist ungültige oder negative Beträge zurück", () => {
     assert.equal(parseEuroToCents(""), null);
     assert.equal(parseEuroToCents("abc"), null);
