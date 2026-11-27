@@ -17,6 +17,8 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Die Anlage von Import-Konten ist keine Server Action mehr und wertet `%` und `_` im Banknamen nicht als Platzhalter. Ein TF-Bank-Import ordnet sich nur noch Konten mit „TF Bank“ im Namen zu, nicht jedem Konto mit „tf“.
 - Kategorien aus dem Client werden auf Eigentum geprüft: Massen-Update, Split-Buchungen, Regeln, Vorlagen, Fixkosten, Budgets und Elternkategorien nehmen keine fremden Kategorien mehr an. Split- und Regel-Listen zeigen keine fremden Kategorienamen.
 - Eine Elternkategorie, die einen Kreis in der Hierarchie erzeugen würde (A → B → A), wird abgelehnt.
+- Server Actions für Konten, Umbuchungen, Saldo-Abgleich, Sparziele, Massenaktionen und Fixkosten prüfen ihre Eingaben mit zod: Beträge nur als ganze Cent mit Obergrenze, nur echte Kalenderdaten, bekannte Kontoarten und Intervalle, begrenzte Textlängen. Vorher ließ sich z. B. ein String als Betrag übergeben, der per String-Verkettung im Saldo landete.
+- Regeln für Server Actions festgehalten in `docs/adr/0001-server-action-vertrag.md`.
 
 ## [1.2.1] – 2026-11-26
 

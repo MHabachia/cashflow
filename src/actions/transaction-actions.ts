@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { userOwnsAllCategories, userOwnsCategory } from "@/lib/ownership";
+import { firstIssueMessage, idListSchema, idSchema } from "@/lib/validation";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -370,16 +371,24 @@ export async function deleteTransactionAction(id: string) {
 /**
  * Massen-Aktualisierung von ausgewählten Transaktionen (Kategorie oder Kostentyp).
  */
-export async function batchUpdateTransactionsAction(input: {
+const batchUpdateSchema = z.object({
+  ids: idListSchema,
+  categoryId: idSchema.optional(),
+  costType: z.enum(["variable", "fixed", "transfer"]).optional(),
+});
+
+export async function batchUpdateTransactionsAction(rawInput: {
   ids: string[];
   categoryId?: string;
   costType?: "variable" | "fixed" | "transfer";
 }) {
   try {
     const user = await requireUser();
-    if (!input.ids || input.ids.length === 0) {
-      return { success: false, error: "Keine Buchungen ausgewählt." };
+    const parsed = batchUpdateSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
     }
+    const input = parsed.data;
     if (input.categoryId && !userOwnsCategory(user.id, input.categoryId)) {
       return { success: false, error: "Ungültige Kategorie." };
     }
@@ -415,12 +424,14 @@ export async function batchUpdateTransactionsAction(input: {
 /**
  * Massen-Löschung von ausgewählten Transaktionen inklusive sauberer Saldenrückabwicklung.
  */
-export async function batchDeleteTransactionsAction(ids: string[]) {
+export async function batchDeleteTransactionsAction(rawIds: string[]) {
   try {
     const user = await requireUser();
-    if (!ids || ids.length === 0) {
-      return { success: false, error: "Keine Buchungen zum Löschen ausgewählt." };
+    const parsed = idListSchema.safeParse(rawIds);
+    if (!parsed.success) {
+      return { success: false, error: "Keine gültigen Buchungen zum Löschen ausgewählt." };
     }
+    const ids = parsed.data;
 
     let deletedCount = 0;
     for (const id of ids) {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { userOwnsCategory } from "@/lib/ownership";
+import { firstIssueMessage, idSchema, positiveCentsSchema } from "@/lib/validation";
 import { processDueRecurringExpenses } from "@/lib/recurring-processor";
 import { todayISO } from "@/lib/format";
 import { and, eq } from "drizzle-orm";
@@ -205,7 +206,25 @@ export async function deleteRecurringExpenseAction(id: string) {
   }
 }
 
-export async function createRecurringFromTransactionAction(params: {
+const DAY_OF_MONTH_ERROR = "Der Tag im Monat muss zwischen 1 und 31 liegen.";
+
+const recurringFromTransactionSchema = z.object({
+  transactionId: idSchema.optional(),
+  name: z.string().trim().min(1, "Bitte eine Bezeichnung angeben.").max(100),
+  amountCents: positiveCentsSchema,
+  type: z.enum(["expense", "income"]),
+  categoryId: idSchema,
+  interval: z.enum(INTERVALS).optional(),
+  dayOfMonth: z
+    .number({ error: DAY_OF_MONTH_ERROR })
+    .int(DAY_OF_MONTH_ERROR)
+    .min(1, DAY_OF_MONTH_ERROR)
+    .max(31, DAY_OF_MONTH_ERROR)
+    .optional(),
+  autoBook: z.boolean().optional(),
+});
+
+export async function createRecurringFromTransactionAction(rawParams: {
   transactionId?: string;
   name: string;
   amountCents: number;
@@ -217,16 +236,11 @@ export async function createRecurringFromTransactionAction(params: {
 }) {
   try {
     const user = await requireUser();
-
-    if (!params.name?.trim()) {
-      return { success: false, error: "Bitte eine Bezeichnung angeben." };
+    const parsed = recurringFromTransactionSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
     }
-    if (!params.amountCents || params.amountCents <= 0) {
-      return { success: false, error: "Der Betrag muss größer als 0 sein." };
-    }
-    if (!params.categoryId) {
-      return { success: false, error: "Bitte eine Kategorie wählen." };
-    }
+    const params = parsed.data;
     if (!userOwnsCategory(user.id, params.categoryId)) {
       return { success: false, error: "Ungültige Kategorie." };
     }

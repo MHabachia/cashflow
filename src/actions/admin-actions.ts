@@ -108,6 +108,9 @@ export async function adminUpdateUserRoleAction(
   role: "admin" | "user"
 ) {
   const admin = await requireAdmin();
+  if (role !== "admin" && role !== "user") {
+    return { success: false, error: "Ungültige Rolle." };
+  }
   if (admin.id === targetUserId && role !== "admin") {
     return {
       success: false,
