@@ -8,6 +8,7 @@ import {
   PAYMENT_METHODS,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { userOwnsCategory, wouldCreateCategoryCycle } from "@/lib/ownership";
 import { and, eq, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -51,6 +52,17 @@ export async function saveCategoryAction(
   }
 
   const cleanParentId = data.parentId?.trim() || null;
+  if (cleanParentId) {
+    if (!userOwnsCategory(user.id, cleanParentId)) {
+      return { success: false, error: "Ungültige übergeordnete Kategorie." };
+    }
+    if (data.id && wouldCreateCategoryCycle(user.id, data.id, cleanParentId)) {
+      return {
+        success: false,
+        error: "Diese Zuordnung würde einen Kreis in der Kategorie-Hierarchie erzeugen.",
+      };
+    }
+  }
 
   if (data.id) {
     db.update(categories)
@@ -169,6 +181,9 @@ export async function saveVariablePresetAction(
   }
 
   const data = parsed.data;
+  if (!userOwnsCategory(user.id, data.categoryId)) {
+    return { success: false, error: "Ungültige Kategorie." };
+  }
   if (data.id) {
     db.update(variablePresets)
       .set({
