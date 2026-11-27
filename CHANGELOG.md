@@ -11,6 +11,11 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - GitHub Actions aktualisiert (checkout 7, setup-node 7, Docker-Actions für Buildx, Login, Metadaten und Build).
 - Dependabot fasst Action-Updates in einer PR zusammen und schlägt keine Hauptversionen mehr vor, die eine eigene Migration brauchen (Node.js, Next.js, TypeScript, Recharts).
 
+### Security
+- Gesperrte Benutzer erhalten über keinen Anmeldeweg mehr eine Sitzung, auch nicht per Passkey. API-Routen (Belege, Profilbild, CSV-Export, Bank-Sync) behandeln gesperrte Benutzer als nicht angemeldet.
+- Der Import (CSV, CAMT, PDF) bucht nur noch auf eigene Konten; eine fremde Konto-ID wird abgelehnt.
+- Die Anlage von Import-Konten ist keine Server Action mehr und wertet `%` und `_` im Banknamen nicht als Platzhalter.
+
 ## [1.2.1] – 2026-11-26
 
 Bank nach einem Schlüsselwechsel wieder verbinden.

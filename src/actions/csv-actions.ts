@@ -5,7 +5,6 @@ import {
   categories,
   transactions,
   bankAccounts,
-  connectedBanks,
   categoryRules,
   PAYMENT_METHODS,
   type PaymentMethod,
@@ -14,7 +13,8 @@ import { requireUser } from "@/lib/session";
 import { parseEuroToCents, todayISO } from "@/lib/format";
 import { findMatchingRule } from "@/lib/category-rules";
 import { detectOwnAccountTransfers } from "@/lib/transfer-detection";
-import { and, eq, like, desc, isNull, sql } from "drizzle-orm";
+import { getOrCreateImportBankAccount } from "@/lib/import-bank-account";
+import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import crypto from "node:crypto";
 
@@ -95,103 +95,29 @@ export type CsvImportResult =
     error: string;
   };
 
-/**
- * Findet ein bestehendes Bankkonto des Benutzers oder legt ein dediziertes
- * Import-Konto (z. B. "Advanzia Mastercard" oder "TF Bank Mastercard") an.
- */
-export async function getOrCreateImportBankAccount(
-  userId: string,
-  bankName: string,
-  bankKey: string
-): Promise<string> {
-  const searchTerm =
-    bankKey === "advanzia"
-      ? "%advanzia%"
-      : bankKey === "tfbank"
-        ? "%tf%"
-        : `%${bankName.toLowerCase()}%`;
-
-  const existing = db
-    .select({ id: bankAccounts.id })
-    .from(bankAccounts)
-    .where(
-      and(
-        eq(bankAccounts.userId, userId),
-        like(bankAccounts.accountName, searchTerm)
-      )
-    )
-    .get();
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const now = new Date();
-
-  // Sicherstellen, dass eine verbundene Bank existiert (FK-Integrität)
-  let bank = db
-    .select({ id: connectedBanks.id })
-    .from(connectedBanks)
-    .where(
-      and(
-        eq(connectedBanks.userId, userId),
-        like(connectedBanks.institutionName, searchTerm)
-      )
-    )
-    .get();
-
-  if (!bank) {
-    const newBankId = crypto.randomUUID();
-    db.insert(connectedBanks)
-      .values({
-        id: newBankId,
-        userId,
-        provider: "enable_banking",
-        institutionId: bankKey,
-        institutionName: bankName,
-        encryptedAccessToken: "manual_import",
-        consentId: "manual_import",
-        consentExpiresAt: "2099-12-31",
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    bank = { id: newBankId };
-  }
-
-  const newId = crypto.randomUUID();
-  db.insert(bankAccounts)
-    .values({
-      id: newId,
-      userId,
-      connectedBankId: bank.id,
-      accountExternalId: `manual_${bankKey}_${crypto.randomBytes(4).toString("hex")}`,
-      ibanMasked:
-        bankKey === "advanzia"
-          ? "Advanzia Mastercard"
-          : bankKey === "tfbank"
-            ? "TF Bank Mastercard"
-            : "Importiertes Konto",
-      accountName: bankName,
-      accountType: "credit_card",
-      currency: "EUR",
-      balanceCents: null,
-      autoSync: false,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
-
-  return newId;
-}
-
 export async function importCsvTransactionsAction(
   csvText: string,
   targetBankAccountId?: string | null,
   updateBalance: boolean = false
 ): Promise<CsvImportResult> {
   const user = await requireUser();
+
+  // Die Konto-ID kommt vom Client: Nur eigene Konten sind als Ziel erlaubt
+  if (targetBankAccountId) {
+    const ownAccount = db
+      .select({ id: bankAccounts.id })
+      .from(bankAccounts)
+      .where(
+        and(
+          eq(bankAccounts.id, targetBankAccountId),
+          eq(bankAccounts.userId, user.id)
+        )
+      )
+      .get();
+    if (!ownAccount) {
+      return { success: false, error: "Das gewählte Konto wurde nicht gefunden." };
+    }
+  }
 
   const cleanText = csvText.replace(/^\uFEFF/, "").trim();
   if (!cleanText) {
@@ -464,7 +390,12 @@ export async function importCsvTransactionsAction(
             balanceCents: currentBalance + netDeltaCents,
             updatedAt: now,
           })
-          .where(eq(bankAccounts.id, targetBankAccountId))
+          .where(
+            and(
+              eq(bankAccounts.id, targetBankAccountId),
+              eq(bankAccounts.userId, user.id)
+            )
+          )
           .run();
       }
     }
@@ -542,7 +473,7 @@ export async function importStatementFileAction(
 
       let targetBankAccountId = explicitBankAccountId;
       if (!targetBankAccountId && detectedBank) {
-        targetBankAccountId = await getOrCreateImportBankAccount(
+        targetBankAccountId = getOrCreateImportBankAccount(
           user.id,
           detectedBank.bankName,
           detectedBank.bankKey
@@ -647,7 +578,7 @@ export async function importStatementFileAction(
 
     let targetBankAccountId = explicitBankAccountId;
     if (!targetBankAccountId && detected) {
-      targetBankAccountId = await getOrCreateImportBankAccount(
+      targetBankAccountId = getOrCreateImportBankAccount(
         user.id,
         detected.bankName,
         detected.bankKey

@@ -11,6 +11,7 @@ import { count, eq } from "drizzle-orm";
 import { validateAuthSecret } from "./auth-guard";
 import { isSignUpAllowedInContext } from "./signup-guard";
 import { buildTrustedOrigins } from "./trusted-origins";
+import { isUserBanned } from "./user-status";
 
 /**
  * Kontobezogene Sperre nach fehlgeschlagenen Anmeldungen.
@@ -209,6 +210,18 @@ export const auth = betterAuth({
         after: async (user) => {
           // Automatisch Standardkategorien & variable Vorlagen für den neuen User anlegen
           ensureDefaultCategoriesForUser(user.id);
+        },
+      },
+    },
+    session: {
+      create: {
+        // Gesperrte Benutzer erhalten über keinen Anmeldeweg eine Sitzung
+        // (Passwort, Passkey, 2FA). Better Auth bricht die Anmeldung dann ab.
+        before: async (session) => {
+          if (isUserBanned(session.userId)) {
+            console.warn("[Auth] Sitzung für gesperrten Benutzer verweigert.");
+            return false;
+          }
         },
       },
     },

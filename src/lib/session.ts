@@ -5,8 +5,13 @@ import { ensureDefaultCategoriesForUser } from "./db/defaults";
 import { db } from "./db";
 import { session as sessionTable } from "./db/schema";
 import { eq, and, ne } from "drizzle-orm";
+import { isUserBanned } from "./user-status";
 
-export async function getCurrentSession() {
+/**
+ * Aktuelle Sitzung ohne Sperrprüfung. Nur für `requireUser`, das gesperrte
+ * Benutzer mit eigenem Hinweis auf die Anmeldeseite leitet.
+ */
+async function loadSession() {
   // Test-Session ausschließlich in der Unit-Test-Umgebung (NODE_ENV=test).
   // In jeder anderen Umgebung wird TEST_USER_ID ignoriert, damit eine falsch
   // gesetzte Variable niemals die Authentifizierung aushebelt.
@@ -32,12 +37,22 @@ export async function getCurrentSession() {
   return session;
 }
 
+/**
+ * Aktuelle Sitzung oder `null`. Gesperrte Benutzer gelten als nicht angemeldet,
+ * damit API-Routen sie ohne eigene Prüfung abweisen.
+ */
+export async function getCurrentSession() {
+  const session = await loadSession();
+  if (!session?.user || isUserBanned(session.user.id)) return null;
+  return session;
+}
+
 export async function requireUser() {
-  const session = await getCurrentSession();
+  const session = await loadSession();
   if (!session?.user) {
     redirect("/login");
   }
-  if ((session.user as { banned?: boolean }).banned) {
+  if (isUserBanned(session.user.id)) {
     redirect("/login?banned=1");
   }
   ensureDefaultCategoriesForUser(session.user.id);
