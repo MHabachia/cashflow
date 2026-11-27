@@ -17,6 +17,14 @@ export async function GET(
   const { filename } = await context.params;
   const safeFilename = path.basename(filename);
 
+  // Nur das eigene Profilbild ausliefern (Admins dürfen alle sehen). Der
+  // Dateiname allein ist kein ausreichendes Geheimnis.
+  const isOwnAvatar = session.user.image === `/api/profile/avatar/${safeFilename}`;
+  const isAdmin = (session.user as { role?: string }).role === "admin";
+  if (!isOwnAvatar && !isAdmin) {
+    return NextResponse.json({ error: "Profilbild nicht gefunden." }, { status: 404 });
+  }
+
   const uploadsRoot = path.resolve(process.env.UPLOADS_DIR || "./data/uploads");
   const filePath = path.join(uploadsRoot, "avatars", safeFilename);
 

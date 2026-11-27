@@ -4,7 +4,9 @@ import { createSignedStateToken } from "@/lib/crypto/vault";
 import { getBankSyncProvider } from "@/lib/bank-sync/provider";
 import { POPULAR_BANK_INSTITUTIONS } from "@/lib/bank-institutions";
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 import { getAppBaseUrl, createAbsoluteUrl } from "@/lib/url";
+import { bankErrorCodeFor } from "@/lib/bank-error-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -64,13 +66,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(sessionResult.authUrl);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     console.error("Fehler bei Bank-Autorisierung:", err);
-    const msg = (err as Error)?.message || "auth_failed";
+    const code = bankErrorCodeFor(err, "auth_failed");
     return NextResponse.redirect(
-      createAbsoluteUrl(
-        `/banking?bank_error=${encodeURIComponent(msg)}`,
-        request
-      )
+      createAbsoluteUrl(`/banking?bank_error=${code}`, request)
     );
   }
 }

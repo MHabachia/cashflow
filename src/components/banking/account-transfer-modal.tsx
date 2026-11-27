@@ -27,9 +27,16 @@ export function AccountTransferModal({
   const [dateInput, setDateInput] = useState("");
   const [descriptionInput, setDescriptionInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Neuer Einmal-Schlüssel je Öffnen: Der Server bucht dieselbe Anfrage nur einmal
+  const [requestId, setRequestId] = useState("");
 
   useEffect(() => {
     if (open) {
+      setRequestId(
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
       const today = new Date().toISOString().slice(0, 10);
       setDateInput(today);
       setDescriptionInput("Kartenausgleich / Umbuchung");
@@ -83,6 +90,7 @@ export function AccountTransferModal({
         amountCents: cents,
         date: dateInput || undefined,
         description: descriptionInput.trim() || undefined,
+        clientRequestId: requestId || undefined,
       });
 
       if (res.success) {

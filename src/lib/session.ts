@@ -6,6 +6,7 @@ import { db } from "./db";
 import { session as sessionTable } from "./db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { isUserBanned } from "./user-status";
+import { UserFacingError } from "./errors";
 
 /**
  * Aktuelle Sitzung ohne Sperrprüfung. Nur für `requireUser`, das gesperrte
@@ -62,7 +63,7 @@ export async function requireUser() {
 export async function requireAdmin() {
   const user = await requireUser();
   if ((user as { role?: string }).role !== "admin") {
-    throw new Error("Keine Administrator-Berechtigung.");
+    throw new UserFacingError("Keine Administrator-Berechtigung.");
   }
   return user;
 }

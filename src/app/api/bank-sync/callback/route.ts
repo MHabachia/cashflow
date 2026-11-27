@@ -8,6 +8,8 @@ import { db } from "@/lib/db";
 import { connectedBanks, bankAccounts } from "@/lib/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
+import { bankErrorCodeFor } from "@/lib/bank-error-codes";
 import { createAbsoluteUrl } from "@/lib/url";
 import { logAudit } from "@/lib/audit";
 import crypto from "node:crypto";
@@ -49,7 +51,8 @@ export async function GET(request: NextRequest) {
     if (!validation.valid || !validation.institutionId) {
       return NextResponse.redirect(
         createAbsoluteUrl(
-          `/banking?bank_error=${encodeURIComponent(validation.error || "csrf")}`,
+          // Abgelaufene Sitzung gesondert melden, sonst Verdacht auf CSRF
+          `/banking?bank_error=${validation.error?.includes("abgelaufen") ? "expired" : "csrf"}`,
           request
         )
       );
@@ -215,13 +218,11 @@ export async function GET(request: NextRequest) {
       createAbsoluteUrl("/banking?bank_connected=1", request)
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     console.error("Fehler im Bank-Sync Callback:", err);
-    const msg = (err as Error)?.message || "callback_failed";
+    const code = bankErrorCodeFor(err, "callback_failed");
     return NextResponse.redirect(
-      createAbsoluteUrl(
-        `/banking?bank_error=${encodeURIComponent(msg)}`,
-        request
-      )
+      createAbsoluteUrl(`/banking?bank_error=${code}`, request)
     );
   }
 }

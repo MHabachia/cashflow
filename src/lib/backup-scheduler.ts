@@ -1,4 +1,5 @@
 import { sqlite } from "@/lib/db";
+import { UserFacingError } from "@/lib/errors";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -51,7 +52,7 @@ function encryptionKey(): Buffer | null {
   const raw = process.env.BACKUP_ENCRYPTION_KEY?.trim();
   if (!raw) return null;
   if (raw.length < 32) {
-    throw new Error("BACKUP_ENCRYPTION_KEY muss mindestens 32 Zeichen lang sein.");
+    throw new UserFacingError("BACKUP_ENCRYPTION_KEY muss mindestens 32 Zeichen lang sein.");
   }
   return Buffer.from(crypto.hkdfSync("sha256", raw, "cashflow-backup", "backup-v1", 32));
 }
@@ -65,7 +66,7 @@ export function encryptBackup(data: Buffer, key: Buffer): Buffer {
 
 export function decryptBackup(data: Buffer, key: Buffer): Buffer {
   if (!data.subarray(0, ENC_MAGIC.length).equals(ENC_MAGIC)) {
-    throw new Error("Unbekanntes Format der verschlüsselten Sicherung.");
+    throw new UserFacingError("Unbekanntes Format der verschlüsselten Sicherung.");
   }
   const offset = ENC_MAGIC.length;
   const iv = data.subarray(offset, offset + 12);
@@ -144,12 +145,12 @@ export async function runAutoBackup(options: { force?: boolean; now?: Date } = {
  */
 export function readAutoBackupAsSqlite(name: string, dir: string = getBackupDir()): Buffer {
   if (!FILE_PATTERN.test(name) || path.basename(name) !== name) {
-    throw new Error("Ungültiger Dateiname.");
+    throw new UserFacingError("Ungültiger Dateiname.");
   }
   let data: Buffer = fs.readFileSync(path.join(dir, name));
   if (name.endsWith(".enc")) {
     const key = encryptionKey();
-    if (!key) throw new Error("BACKUP_ENCRYPTION_KEY fehlt zum Entschlüsseln.");
+    if (!key) throw new UserFacingError("BACKUP_ENCRYPTION_KEY fehlt zum Entschlüsseln.");
     data = decryptBackup(data, key);
   }
   return zlib.gunzipSync(data);

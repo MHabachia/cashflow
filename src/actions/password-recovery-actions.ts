@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { user as userTable } from "@/lib/db/schema";
-import { requireAdmin, requireUser } from "@/lib/session";
+import { getCurrentSession, requireAdmin, requireUser } from "@/lib/session";
 import { checkAccountLoginLock, recordLoginFailure } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { getAppBaseUrl } from "@/lib/url";
@@ -92,12 +92,34 @@ export async function getRecoveryCodeStatusAction() {
   };
 }
 
+/** Höchstalter einer Sitzung für sicherheitskritische Aktionen ohne Passwortabfrage. */
+const FRESH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
+
+function isFreshSession(session: object | undefined): boolean {
+  const raw = session && "createdAt" in session ? session.createdAt : undefined;
+  if (!(raw instanceof Date) && typeof raw !== "string" && typeof raw !== "number") return false;
+  const createdAt = new Date(raw).getTime();
+  return Number.isFinite(createdAt) && Date.now() - createdAt <= FRESH_SESSION_MAX_AGE_MS;
+}
+
 export async function generateRecoveryCodesAction(input: { currentPassword: string }) {
   const user = await requireUser();
   // Erneute Passwortabfrage: Wer nur eine gestohlene Sitzung hat, soll sich
   // keine dauerhaften Hintertüren erzeugen können
-  if (userHasPassword(user.id) && !(await verifyUserPassword(user.id, input.currentPassword))) {
-    return { success: false, error: "Das aktuelle Passwort ist nicht korrekt." };
+  if (userHasPassword(user.id)) {
+    if (!(await verifyUserPassword(user.id, input.currentPassword))) {
+      return { success: false, error: "Das aktuelle Passwort ist nicht korrekt." };
+    }
+  } else {
+    // Ohne Passwort (nur Passkey) gibt es nichts abzufragen: Dann muss die
+    // Anmeldung frisch sein, damit eine alte, gestohlene Sitzung nicht reicht
+    const session = await getCurrentSession();
+    if (!isFreshSession(session?.session)) {
+      return {
+        success: false,
+        error: "Bitte melde dich ab und erneut an, um neue Wiederherstellungscodes zu erzeugen.",
+      };
+    }
   }
   const codes = generateRecoveryCodes(user.id);
   logAudit({ action: "auth.recovery_codes.generate", userId: user.id, headers: await headers() });

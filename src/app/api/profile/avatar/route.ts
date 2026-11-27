@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { db } from "@/lib/db";
 import { user as userTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -127,10 +128,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Fehler beim Verarbeiten des Profilbilds.",
+        error: publicErrorMessage(err, "Fehler beim Verarbeiten des Profilbilds.", "api/profile/avatar"),
       },
       { status: 500 }
     );

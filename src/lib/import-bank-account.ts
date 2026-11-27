@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
 import { db } from "./db";
 import { bankAccounts, connectedBanks } from "./db/schema";
+import { UserFacingError } from "./errors";
 
 /**
  * Bewusst KEINE Server Action (kein "use server"): Die Funktion vertraut der
@@ -32,7 +33,7 @@ export function getOrCreateImportBankAccount(
   const needle = searchNeedle(bankName, bankKey);
   // Ein leerer Suchbegriff würde auf jedes Konto passen
   if (!needle) {
-    throw new Error("Bankname für das Import-Konto fehlt.");
+    throw new UserFacingError("Bankname für das Import-Konto fehlt.");
   }
 
   const existing = db

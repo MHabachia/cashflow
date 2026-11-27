@@ -1,4 +1,5 @@
 import type { ParsedStatementTransaction } from "@/lib/pdf-statement-parser";
+import { UserFacingError } from "@/lib/errors";
 
 /**
  * Parser für ISO-20022-Kontoauszüge (CAMT.053, auch CAMT.052/054), wie sie
@@ -74,7 +75,7 @@ export function isCamtXml(text: string): boolean {
 export function parseCamtStatement(xmlText: string): CamtStatement {
   const xml = normalizeXml(xmlText);
   if (!/<(BkToCstmrStmt|BkToCstmrAcctRpt|BkToCstmrDbtCdtNtfctn)>/.test(xml)) {
-    throw new Error("Keine CAMT-Datei (BkToCstmrStmt nicht gefunden).");
+    throw new UserFacingError("Keine CAMT-Datei (BkToCstmrStmt nicht gefunden).");
   }
 
   const iban = first(xml, ["Acct", "Id", "IBAN"]);

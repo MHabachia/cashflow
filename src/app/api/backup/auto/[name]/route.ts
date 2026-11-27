@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { readAutoBackupAsSqlite } from "@/lib/backup-scheduler";
 import { logAudit } from "@/lib/audit";
 
@@ -35,7 +36,7 @@ export async function GET(
     });
   } catch (err) {
     return NextResponse.json(
-      { error: (err as Error)?.message || "Sicherung nicht gefunden." },
+      { error: publicErrorMessage(err, "Sicherung nicht gefunden.", "api/backup/auto") },
       { status: 404 }
     );
   }

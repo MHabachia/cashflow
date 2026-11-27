@@ -10,6 +10,7 @@ import {
   type BankAccountType,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { publicErrorMessage } from "@/lib/errors";
 import { logAudit } from "@/lib/audit";
 import { encryptBankToken } from "@/lib/crypto/vault";
 import { POPULAR_BANK_INSTITUTIONS } from "@/lib/bank-institutions";
@@ -32,7 +33,7 @@ import {
   positiveCentsSchema,
   signedCentsSchema,
 } from "@/lib/validation";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import crypto from "node:crypto";
@@ -61,6 +62,8 @@ const accountTransferSchema = z.object({
   amountCents: positiveCentsSchema,
   date: isoDateSchema.optional(),
   description: z.string().max(200).optional(),
+  /** Einmal-Schlüssel des Formulars: Wiederholte Anfragen buchen nicht doppelt */
+  clientRequestId: idSchema.optional(),
 });
 
 const reconcileBalanceSchema = z.object({
@@ -149,7 +152,7 @@ export async function disconnectBankAction(connectedBankId: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Bankverbindung konnte nicht getrennt werden.",
+      error: publicErrorMessage(err, "Bankverbindung konnte nicht getrennt werden.", "bank-actions"),
     };
   }
 }
@@ -180,7 +183,7 @@ export async function toggleAccountAutoSyncAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Synchronisationsstatus konnte nicht geändert werden.",
+      error: publicErrorMessage(err, "Synchronisationsstatus konnte nicht geändert werden.", "bank-actions"),
     };
   }
 }
@@ -215,7 +218,7 @@ export async function deleteBankAccountAction(accountId: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Konto konnte nicht entfernt werden.",
+      error: publicErrorMessage(err, "Konto konnte nicht entfernt werden.", "bank-actions"),
     };
   }
 }
@@ -239,7 +242,7 @@ export async function syncBankAccountAction(accountId: string) {
       importedCount: 0,
       skippedCount: 0,
       balanceCents: null,
-      error: (err as Error)?.message || "Synchronisation fehlgeschlagen.",
+      error: publicErrorMessage(err, "Synchronisation fehlgeschlagen.", "bank-actions"),
     };
   }
 }
@@ -262,7 +265,7 @@ export async function syncAllAccountsAction() {
       success: false,
       totalImported: 0,
       totalSkipped: 0,
-      errors: [(err as Error)?.message || "Synchronisation fehlgeschlagen."],
+      errors: [publicErrorMessage(err, "Synchronisation fehlgeschlagen.", "bank-actions")],
     };
   }
 }
@@ -394,7 +397,7 @@ export async function connectBankInstitutionAction(institutionId: string) {
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Bankverbindung konnte nicht hergestellt werden.",
+      error: publicErrorMessage(err, "Bankverbindung konnte nicht hergestellt werden.", "bank-actions"),
     };
   }
 }
@@ -458,7 +461,7 @@ export async function createManualBankAccountAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Konto konnte nicht angelegt werden.",
+      error: publicErrorMessage(err, "Konto konnte nicht angelegt werden.", "bank-actions"),
     };
   }
 }
@@ -533,7 +536,7 @@ export async function updateBankAccountAction(rawInput: UpdateBankAccountInput) 
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Konto konnte nicht aktualisiert werden.",
+      error: publicErrorMessage(err, "Konto konnte nicht aktualisiert werden.", "bank-actions"),
     };
   }
 }
@@ -544,6 +547,7 @@ export interface AccountTransferInput {
   amountCents: number;
   date?: string;
   description?: string;
+  clientRequestId?: string;
 }
 
 /**
@@ -623,6 +627,26 @@ export async function transferBetweenAccountsAction(
       customDesc ||
       `Ausgleichszahlung von ${sourceAccount.accountName}`;
 
+    // Doppelte Anfrage (Doppelklick, Wiederholung nach Verbindungsabbruch):
+    // Die erste hat bereits gebucht. Prüfung und Buchung laufen ohne await
+    // dazwischen; der eindeutige Index auf client_temp_id sichert zusätzlich.
+    const requestKeys = input.clientRequestId
+      ? { out: `transfer:${input.clientRequestId}:out`, in: `transfer:${input.clientRequestId}:in` }
+      : null;
+    if (requestKeys) {
+      const alreadyBooked = db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.userId, user.id),
+            inArray(transactions.clientTempId, [requestKeys.out, requestKeys.in])
+          )
+        )
+        .get();
+      if (alreadyBooked) return { success: true };
+    }
+
     db.transaction((tx) => {
       // 1. Ausgangskonto belasten
       if (!sourceSynced && sourceAccount.balanceCents !== null) {
@@ -659,6 +683,7 @@ export async function transferBetweenAccountsAction(
           description: outDesc,
           bankAccountId: sourceAccount.id,
           paymentMethod: "transfer",
+          clientTempId: requestKeys?.out ?? null,
           createdAt: now,
           updatedAt: now,
         })
@@ -677,6 +702,7 @@ export async function transferBetweenAccountsAction(
           description: inDesc,
           bankAccountId: targetAccount.id,
           paymentMethod: "transfer",
+          clientTempId: requestKeys?.in ?? null,
           createdAt: now,
           updatedAt: now,
         })
@@ -692,7 +718,7 @@ export async function transferBetweenAccountsAction(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Umbuchung fehlgeschlagen.",
+      error: publicErrorMessage(err, "Umbuchung fehlgeschlagen.", "bank-actions"),
     };
   }
 }
@@ -825,7 +851,7 @@ export async function reconcileAccountBalanceAction(rawInput: ReconcileBalanceIn
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error)?.message || "Saldenabgleich fehlgeschlagen.",
+      error: publicErrorMessage(err, "Saldenabgleich fehlgeschlagen.", "bank-actions"),
     };
   }
 }

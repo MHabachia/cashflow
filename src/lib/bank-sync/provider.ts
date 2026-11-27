@@ -1,6 +1,7 @@
 import { POPULAR_BANK_INSTITUTIONS } from "../bank-institutions";
 import type { BankAccountType, BankProvider } from "../db/schema";
 import crypto from "node:crypto";
+import { UserFacingError } from "../errors";
 import fs from "node:fs";
 
 export interface DiscoveredAccount {
@@ -127,7 +128,7 @@ class MockBankSyncProvider implements BankSyncProvider {
       (i) => i.id === params.institutionId
     );
     if (!inst) {
-      throw new Error(`Unbekannte Bank: ${params.institutionId}`);
+      throw new UserFacingError("Diese Bank wird nicht unterstützt.");
     }
 
     const mockCode = `mock_code_${inst.id}_${crypto.randomBytes(8).toString("hex")}`;
@@ -151,7 +152,7 @@ class MockBankSyncProvider implements BankSyncProvider {
       (i) => i.id === params.institutionId
     );
     if (!inst) {
-      throw new Error(`Unbekannte Bank: ${params.institutionId}`);
+      throw new UserFacingError("Diese Bank wird nicht unterstützt.");
     }
 
     const now = new Date();
@@ -494,7 +495,7 @@ export class EnableBankingLiveProvider implements BankSyncProvider {
       (i) => i.id === params.institutionId
     );
     if (!inst) {
-      throw new Error(`Unbekannte Bank: ${params.institutionId}`);
+      throw new UserFacingError("Diese Bank wird nicht unterstützt.");
     }
 
     const expiresDate = new Date();
@@ -948,7 +949,7 @@ export function getBankSyncProvider(): BankSyncProvider {
   }
 
   if (!isMockBankingAllowed()) {
-    throw new Error(BANK_SYNC_NOT_CONFIGURED_ERROR);
+    throw new UserFacingError(BANK_SYNC_NOT_CONFIGURED_ERROR);
   }
 
   if (!cachedMockProvider) {

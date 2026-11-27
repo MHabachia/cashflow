@@ -110,7 +110,14 @@ export const INTERVAL_LABELS: Record<string, string> = {
 export function escapeCsvField(val: string | number | null | undefined): string {
   let str = val === null || val === undefined ? "" : String(val);
 
-  if (/^[=+\-@\t\r]/.test(str)) {
+  // Zeilenumbrüche vereinheitlichen und übrige Steuerzeichen entfernen
+  // (Texte aus dem Bank-Sync werden ungefiltert übernommen)
+  str = str
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+
+  // Auch mit führenden Leerzeichen/Tabs werten Tabellenprogramme Formeln aus
+  if (/^\s*[=+\-@]/.test(str) || /^[\t\n]/.test(str)) {
     str = `'${str}`;
   }
 

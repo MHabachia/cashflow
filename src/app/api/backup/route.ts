@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/session";
 import { sqlite } from "@/lib/db";
 import { MAX_RESTORE_BYTES, stageRestore } from "@/lib/db/restore";
 import { logAudit } from "@/lib/audit";
+import { publicErrorMessage } from "@/lib/errors";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -21,33 +22,35 @@ export async function GET() {
 
     logAudit({ action: "admin.backup.download", actorId: admin.id });
 
-    // Sicherer temporärer Pfad für das SQLite-Backup
-    const tempFile = path.join(
-      os.tmpdir(),
-      `cashflow-backup-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`
-    );
-
-    // Erstellt einen 100% konsistenten Snapshot auch bei parallelen Schreibzugriffen
-    await sqlite.backup(tempFile);
-
-    const fileBuffer = fs.readFileSync(tempFile);
-    fs.unlinkSync(tempFile);
+    // Eigenes Verzeichnis mit Rechten 0700: Die Kopie der gesamten Datenbank
+    // ist für andere Benutzer des Systems nicht lesbar und wird immer entfernt
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cashflow-backup-"));
+    let fileBuffer: Buffer;
+    try {
+      const tempFile = path.join(tempDir, "backup.sqlite");
+      // Erstellt einen konsistenten Snapshot auch bei parallelen Schreibzugriffen
+      await sqlite.backup(tempFile);
+      fileBuffer = fs.readFileSync(tempFile);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     const filename = `cashflow-backup-${dateStr}-${timeStr}.sqlite`;
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         "Content-Type": "application/vnd.sqlite3",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Content-Length": fileBuffer.length.toString(),
+        "Cache-Control": "no-store",
       },
     });
   } catch (err: unknown) {
     return NextResponse.json(
-      { error: (err as Error)?.message || "Fehler beim Erstellen des Backups" },
+      { error: publicErrorMessage(err, "Fehler beim Erstellen des Backups.", "api/backup:get") },
       { status: 500 }
     );
   }
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     return NextResponse.json(
-      { error: (err as Error)?.message || "Wiederherstellung fehlgeschlagen" },
+      { error: publicErrorMessage(err, "Wiederherstellung fehlgeschlagen.", "api/backup:post") },
       { status: 500 }
     );
   }
