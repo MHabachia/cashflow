@@ -6,6 +6,7 @@ import {
   bankAccounts,
   transactions,
   categories,
+  BANK_ACCOUNT_TYPES,
   type BankAccountType,
 } from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
@@ -22,9 +23,53 @@ import {
   syncAllActiveBankAccounts,
 } from "@/lib/bank-sync/sync-engine";
 import { getOrCreateTransferCategory } from "@/lib/transfer-detection";
+import {
+  firstIssueMessage,
+  idSchema,
+  isoDateSchema,
+  nonNegativeCentsSchema,
+  optionalText,
+  positiveCentsSchema,
+  signedCentsSchema,
+} from "@/lib/validation";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import crypto from "node:crypto";
+
+const BILLING_DAY_ERROR = "Der Abrechnungstag muss zwischen 1 und 31 liegen.";
+const billingDaySchema = z.number({ error: BILLING_DAY_ERROR }).int(BILLING_DAY_ERROR).min(1, BILLING_DAY_ERROR).max(31, BILLING_DAY_ERROR);
+
+const createManualAccountSchema = z.object({
+  accountName: z.string().trim().min(1, "Bitte gib einen Namen für das Konto oder die Karte an.").max(100),
+  accountType: z.enum(BANK_ACCOUNT_TYPES, { error: "Ungültige Kontoart." }),
+  balanceCents: signedCentsSchema.nullable().optional(),
+  creditLimitCents: nonNegativeCentsSchema.nullable().optional(),
+  billingDayOfMonth: billingDaySchema.nullable().optional(),
+  ibanMasked: optionalText(50),
+  notes: optionalText(500),
+});
+
+const updateBankAccountSchema = createManualAccountSchema
+  .omit({ accountType: true })
+  .partial()
+  .extend({ accountId: idSchema, accountName: z.string().trim().max(100).optional() });
+
+const accountTransferSchema = z.object({
+  sourceAccountId: idSchema,
+  targetAccountId: idSchema,
+  amountCents: positiveCentsSchema,
+  date: isoDateSchema.optional(),
+  description: z.string().max(200).optional(),
+});
+
+const reconcileBalanceSchema = z.object({
+  accountId: idSchema,
+  actualBalanceCents: signedCentsSchema,
+  mode: z.enum(["adjustment_transaction", "set_balance"]).optional(),
+  date: isoDateSchema.optional(),
+  description: z.string().max(200).optional(),
+});
 
 function safeRevalidatePath(path: string) {
   try {
@@ -115,6 +160,9 @@ export async function toggleAccountAutoSyncAction(
 ) {
   try {
     const user = await requireUser();
+    if (typeof autoSync !== "boolean" || !idSchema.safeParse(accountId).success) {
+      return { success: false, error: "Ungültige Eingaben." };
+    }
 
     db.update(bankAccounts)
       .set({
@@ -366,17 +414,16 @@ export interface CreateManualAccountInput {
  * die nicht über PSD2 angebunden werden kann.
  */
 export async function createManualBankAccountAction(
-  input: CreateManualAccountInput
+  rawInput: CreateManualAccountInput
 ) {
   try {
     const user = await requireUser();
-    const cleanName = input.accountName.trim();
-    if (!cleanName) {
-      return {
-        success: false,
-        error: "Bitte gib einen Namen für das Konto oder die Karte an.",
-      };
+    const parsed = createManualAccountSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
     }
+    const input = parsed.data;
+    const cleanName = input.accountName;
 
     const now = new Date();
     const accountId = crypto.randomUUID();
@@ -429,9 +476,14 @@ export interface UpdateBankAccountInput {
 /**
  * Aktualisiert Stammdaten, Saldo, Limit oder Abrechnungstag eines Bankkontos / einer Karte.
  */
-export async function updateBankAccountAction(input: UpdateBankAccountInput) {
+export async function updateBankAccountAction(rawInput: UpdateBankAccountInput) {
   try {
     const user = await requireUser();
+    const parsed = updateBankAccountSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
+    }
+    const input = parsed.data;
     const account = db
       .select()
       .from(bankAccounts)
@@ -500,20 +552,19 @@ export interface AccountTransferInput {
  * sodass der Monats-Cashflow und Lebenshaltungsausgaben nicht fälschlich doppelt gezählt werden.
  */
 export async function transferBetweenAccountsAction(
-  input: AccountTransferInput
+  rawInput: AccountTransferInput
 ) {
   try {
     const user = await requireUser();
+    const parsed = accountTransferSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
+    }
+    const input = parsed.data;
     if (input.sourceAccountId === input.targetAccountId) {
       return {
         success: false,
         error: "Ausgangs- und Zielkonto dürfen nicht identisch sein.",
-      };
-    }
-    if (input.amountCents <= 0) {
-      return {
-        success: false,
-        error: "Der Überweisungsbetrag muss größer als 0 sein.",
       };
     }
 
@@ -660,9 +711,14 @@ export interface ReconcileBalanceInput {
  * Im Modus "adjustment_transaction" wird automatisch eine Ausgleichsbuchung angelegt,
  * im Modus "set_balance" wird der Saldo direkt angepasst.
  */
-export async function reconcileAccountBalanceAction(input: ReconcileBalanceInput) {
+export async function reconcileAccountBalanceAction(rawInput: ReconcileBalanceInput) {
   try {
     const user = await requireUser();
+    const parsed = reconcileBalanceSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
+    }
+    const input = parsed.data;
     const account = db
       .select()
       .from(bankAccounts)

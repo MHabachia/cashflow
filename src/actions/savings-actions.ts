@@ -6,6 +6,15 @@ import { requireUser } from "@/lib/session";
 import { and, eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import {
+  firstIssueMessage,
+  hexColorSchema,
+  idSchema,
+  isoDateSchema,
+  nonNegativeCentsSchema,
+  positiveCentsSchema,
+  signedCentsSchema,
+} from "@/lib/validation";
 import crypto from "node:crypto";
 
 function safeRevalidatePath(path: string) {
@@ -18,19 +27,26 @@ function safeRevalidatePath(path: string) {
 
 const createSavingsGoalSchema = z.object({
   name: z.string().min(1, "Name für das Sparziel erforderlich.").max(100),
-  targetAmountCents: z
-    .number()
-    .int()
-    .positive("Zielbetrag muss größer als 0 € sein."),
-  currentAmountCents: z.number().int().min(0).default(0),
-  targetDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Ungültiges Datumsformat (YYYY-MM-DD)")
-    .optional()
-    .nullable(),
-  icon: z.string().optional().nullable(),
-  color: z.string().optional().nullable(),
+  targetAmountCents: positiveCentsSchema,
+  currentAmountCents: nonNegativeCentsSchema.default(0),
+  targetDate: isoDateSchema.optional().nullable(),
+  icon: z.string().max(50).optional().nullable(),
+  color: hexColorSchema.optional().nullable(),
 });
+
+const adjustSavingsGoalSchema = z.object({
+  goalId: idSchema,
+  deltaCents: signedCentsSchema,
+});
+
+const updateSavingsGoalSchema = createSavingsGoalSchema
+  .omit({ currentAmountCents: true })
+  .partial()
+  .extend({
+    id: idSchema,
+    currentAmountCents: nonNegativeCentsSchema.optional(),
+    isArchived: z.boolean().optional(),
+  });
 
 export async function createSavingsGoalAction(
   input: z.infer<typeof createSavingsGoalSchema>
@@ -41,7 +57,7 @@ export async function createSavingsGoalAction(
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.issues[0]?.message || "Ungültige Eingaben.",
+        error: firstIssueMessage(parsed.error),
       };
     }
 
@@ -75,12 +91,17 @@ export async function createSavingsGoalAction(
   }
 }
 
-export async function adjustSavingsGoalAmountAction(params: {
+export async function adjustSavingsGoalAmountAction(rawParams: {
   goalId: string;
   deltaCents: number;
 }) {
   try {
     const user = await requireUser();
+    const parsed = adjustSavingsGoalSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
+    }
+    const params = parsed.data;
     const existing = db
       .select()
       .from(savingsGoals)
@@ -117,7 +138,7 @@ export async function adjustSavingsGoalAmountAction(params: {
   }
 }
 
-export async function updateSavingsGoalAction(params: {
+export async function updateSavingsGoalAction(rawParams: {
   id: string;
   name?: string;
   targetAmountCents?: number;
@@ -129,6 +150,11 @@ export async function updateSavingsGoalAction(params: {
 }) {
   try {
     const user = await requireUser();
+    const parsed = updateSavingsGoalSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return { success: false, error: firstIssueMessage(parsed.error) };
+    }
+    const params = parsed.data;
     const existing = db
       .select()
       .from(savingsGoals)
