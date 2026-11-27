@@ -11,6 +11,11 @@ import { count, eq } from "drizzle-orm";
 import { validateAuthSecret } from "./auth-guard";
 import { isSignUpAllowedInContext } from "./signup-guard";
 import { buildTrustedOrigins } from "./trusted-origins";
+import { isUserBanned } from "./user-status";
+import { logAudit } from "./audit";
+import { APIError } from "better-auth/api";
+
+const BANNED_MESSAGE = "Dieses Benutzerkonto wurde vom Administrator gesperrt.";
 
 /**
  * Kontobezogene Sperre nach fehlgeschlagenen Anmeldungen.
@@ -209,6 +214,31 @@ export const auth = betterAuth({
         after: async (user) => {
           // Automatisch Standardkategorien & variable Vorlagen für den neuen User anlegen
           ensureDefaultCategoriesForUser(user.id);
+        },
+      },
+    },
+    session: {
+      create: {
+        // Gesperrte Benutzer erhalten über keinen Anmeldeweg eine Sitzung
+        // (Passwort, Passkey, 2FA). Der APIError bricht die Anmeldung mit 403
+        // und verständlicher Meldung ab statt mit einem Serverfehler.
+        before: async (session, context) => {
+          if (!isUserBanned(session.userId)) return;
+          logAudit({
+            action: "auth.login.failure",
+            userId: session.userId,
+            details: { reason: "banned", path: context?.path ?? null },
+            headers: context?.headers ?? context?.request?.headers ?? null,
+          });
+          throw new APIError("FORBIDDEN", { message: BANNED_MESSAGE });
+        },
+        // Schließt das Zeitfenster, in dem ein Benutzer zwischen Prüfung und
+        // Anlage der Sitzung gesperrt wird: Die Sperre hat dessen Sitzungen
+        // bereits gelöscht, diese hier entstand danach und wird entfernt.
+        after: async (session) => {
+          if (isUserBanned(session.userId)) {
+            db.delete(schema.session).where(eq(schema.session.id, session.id)).run();
+          }
         },
       },
     },

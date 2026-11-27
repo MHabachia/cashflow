@@ -6,6 +6,7 @@ Schwachstellen bitte vertraulich melden, siehe [SECURITY.md](../SECURITY.md).
 
 - **Anmeldung:** Passkeys (WebAuthn) und TOTP-2FA; Passwörter mit scrypt gehasht; Sitzungen über `httpOnly`-Cookies, ohne Cookie-Cache, damit gesperrte Konten sofort draußen sind.
 - **Brute-Force-Schutz:** Rate-Limit pro IP in der Datenbank (5 pro Minute für Anmeldung, 2FA und Passwortänderung) und Kontosperre nach 10 Fehlversuchen in 15 Minuten. Die Client-IP kommt aus `IP_ADDRESS_HEADERS` / `TRUSTED_PROXIES`.
+- **Gesperrte Konten:** Beim Sperren werden alle Sitzungen beendet; neue Sitzungen verweigert Better Auth für jeden Anmeldeweg (Passwort, Passkey, 2FA). Auch API-Routen behandeln gesperrte Benutzer als nicht angemeldet.
 - **Registrierung:** Nur der erste Benutzer wird Admin. Danach geht es nur über befristete, einmal einlösbare Einladungen oder direkt durch einen Admin. Der Better-Auth-Endpunkt `/api/auth/sign-up/*` ist gesperrt.
 - **Mandantentrennung:** Jede Abfrage und jede Server Action filtert serverseitig auf den angemeldeten Benutzer; Belegfotos werden nur an ihren Besitzer ausgeliefert.
 - **Uploads:** Bilder werden per `sharp` geprüft (Magic Bytes, Pixel-Limit), als WebP neu kodiert (entfernt EXIF) und gegen Path-Traversal abgesichert.
