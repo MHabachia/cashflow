@@ -44,7 +44,7 @@ export function DuplicateFinderModal({
         );
         onResolved?.();
       } else {
-        toast.error("Fehler beim Löschen des Duplikats.");
+        toast.error(res.error || "Fehler beim Löschen des Duplikats.");
       }
     } catch {
       toast.error("Fehler beim Löschen.");

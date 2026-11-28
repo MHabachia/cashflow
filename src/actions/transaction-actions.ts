@@ -12,6 +12,7 @@ import {
 import { requireUser } from "@/lib/session";
 import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsAllCategories, userOwnsCategory } from "@/lib/ownership";
+import { BANK_TRANSACTION_DELETE_ERROR } from "@/lib/transaction-messages";
 import { firstIssueMessage, idListSchema, idSchema } from "@/lib/validation";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -238,6 +239,7 @@ export async function updateTransactionAction(input: TransactionInput) {
       bankTransactionId: transactions.bankTransactionId,
       amountCents: transactions.amountCents,
       type: transactions.type,
+      isSplit: transactions.isSplit,
     })
     .from(transactions)
     .where(
@@ -247,6 +249,15 @@ export async function updateTransactionAction(input: TransactionInput) {
 
   if (!oldRow) {
     return { success: false, error: "Buchung nicht gefunden." };
+  }
+
+  // Die Teilbeträge einer Aufteilung müssen den Gesamtbetrag ergeben;
+  // Auswertungen rechnen mit den Teilbeträgen
+  if (oldRow.isSplit && data.amountCents !== oldRow.amountCents) {
+    return {
+      success: false,
+      error: "Der Betrag einer aufgeteilten Buchung lässt sich nicht ändern. Bitte zuerst die Aufteilung aufheben.",
+    };
   }
 
   // Prüfen, ob ein altes Belegfoto ersetzt oder entfernt wurde
@@ -310,19 +321,26 @@ export async function updateTransactionAction(input: TransactionInput) {
   return { success: true };
 }
 
-export async function deleteTransactionAction(id: string) {
+export async function deleteTransactionAction(
+  id: string
+): Promise<{ success: true } | { success: false; error: string }> {
   const user = await requireUser();
 
   const existing = db
     .select({
       receiptPath: transactions.receiptPath,
       bankAccountId: transactions.bankAccountId,
+      bankTransactionId: transactions.bankTransactionId,
       amountCents: transactions.amountCents,
       type: transactions.type,
     })
     .from(transactions)
     .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)))
     .get();
+
+  if (existing?.bankTransactionId) {
+    return { success: false, error: BANK_TRANSACTION_DELETE_ERROR };
+  }
 
   if (existing?.receiptPath) {
     removeReceiptFileFromDisk(user.id, existing.receiptPath);
@@ -434,17 +452,20 @@ export async function batchDeleteTransactionsAction(rawIds: string[]) {
     }
     const ids = parsed.data;
 
+    // Bankbuchungen werden übersprungen und gesondert gezählt
     let deletedCount = 0;
+    let skippedBankCount = 0;
     for (const id of ids) {
-      await deleteTransactionAction(id);
-      deletedCount++;
+      const res = await deleteTransactionAction(id);
+      if (res.success) deletedCount++;
+      else skippedBankCount++;
     }
 
     safeRevalidatePath("/");
     safeRevalidatePath("/transactions");
     safeRevalidatePath("/banking");
 
-    return { success: true, count: deletedCount };
+    return { success: true, count: deletedCount, skippedBankCount };
   } catch (err: unknown) {
     return {
       success: false,

@@ -19,6 +19,7 @@ import {
   shiftIsoDate,
 } from "@/lib/recurring-matching";
 import { logAudit } from "@/lib/audit";
+import { ensureDefaultCategoriesForUser } from "../db/defaults";
 import crypto from "node:crypto";
 
 export interface SyncResult {
@@ -95,19 +96,23 @@ export function isRefundText(text: string): boolean {
 /**
  * Ermittelt anhand von Empfänger, Text und Typ eine passende Kategorie.
  */
-function findMatchingCategory(
+export function findMatchingCategory(
   remittanceText: string,
   type: "expense" | "income",
   allCategories: Array<{ id: string; name: string; type: "expense" | "income" }>
 ): string {
   const text = remittanceText.toLowerCase();
 
-  // Typenfilter
+  // Typenfilter; ohne passende Kategorie irgendeine vorhandene (der Aufrufer
+  // stellt sicher, dass es mindestens eine gibt – eine erfundene ID wie früher
+  // "unknown" scheiterte am Fremdschlüssel und rollte den ganzen Abruf zurück)
   const matchingTypeCats = allCategories.filter((c) => c.type === type);
   if (matchingTypeCats.length === 0) {
-    // Fallback auf irgendeine Kategorie
-    return allCategories[0]?.id || "unknown";
+    return allCategories[0].id;
   }
+
+  // Kurze Suchwörter nur als ganzes Wort (sonst träfe „gas“ auch „Gastro“,
+  // „bar“ auch „Barmer“, „db“ jede Referenz mit diesen Buchstaben)
 
   // Intelligentes Keyword-Matching
   if (type === "expense") {
@@ -118,28 +123,28 @@ function findMatchingCategory(
       if (cat) return cat.id;
     }
 
-    if (/(miete|strom|gas|stadtwerke|energie|wasser|wohnung)/i.test(text)) {
+    if (/(miete|strom|\bgas\b|stadtwerke|energie|wasser|wohnung)/i.test(text)) {
       const cat = matchingTypeCats.find((c) =>
         /(wohnen|miete|fixkosten|haushalt)/i.test(c.name)
       );
       if (cat) return cat.id;
     }
 
-    if (/(netflix|spotify|disney|prime|apple|youtube|abo|rundfunk)/i.test(text)) {
+    if (/(netflix|spotify|disney|prime|apple|youtube|\babo\b|rundfunk)/i.test(text)) {
       const cat = matchingTypeCats.find((c) =>
         /(abo|streaming|unterhaltung|medien|digital)/i.test(c.name)
       );
       if (cat) return cat.id;
     }
 
-    if (/(bahn|db|tankstelle|shell|aral|total|esso|benzin|uber|taxi|oepnv)/i.test(text)) {
+    if (/(bahn|\bdb\b|tankstelle|shell|aral|\btotal\b|esso|benzin|\buber\b|taxi|oepnv)/i.test(text)) {
       const cat = matchingTypeCats.find((c) =>
         /(mobilit|transport|auto|verkehr|bahn)/i.test(c.name)
       );
       if (cat) return cat.id;
     }
 
-    if (/(restaurant|cafe|bistro|bar|lieferando|mcdonalds|burger)/i.test(text)) {
+    if (/(restaurant|cafe|bistro|\bbar\b|lieferando|mcdonalds|burger)/i.test(text)) {
       const cat = matchingTypeCats.find((c) =>
         /(restaurant|essen|freizeit|ausgehen)/i.test(c.name)
       );
@@ -284,7 +289,9 @@ export async function syncBankAccountTransactions(
       dateFrom: computeDateFrom(account.id, startedAt),
     });
 
-    // 4. Hilfsdaten für Auto-Matching laden (Kategorien & Fixkosten)
+    // 4. Hilfsdaten für Auto-Matching laden (Kategorien & Fixkosten).
+    // Jede Buchung braucht eine Kategorie: Standardkategorien sicherstellen
+    ensureDefaultCategoriesForUser(userId);
     const userCategories = db
       .select({ id: categories.id, name: categories.name, type: categories.type })
       .from(categories)

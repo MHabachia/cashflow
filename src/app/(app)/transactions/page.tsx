@@ -68,6 +68,7 @@ export default async function TransactionsPage() {
         receiptPath: t.receiptPath,
         isSplit: t.isSplit,
         bankAccountId: t.bankAccountId,
+        isBankSynced: Boolean(t.bankTransactionId),
         bankAccountName: t.bankAccountId
           ? accountMap[t.bankAccountId]?.accountName || "Bankkonto"
           : null,
