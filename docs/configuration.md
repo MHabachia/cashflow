@@ -17,6 +17,8 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt, am einfachsten in ei
 | `TOKEN_ENCRYPTION_KEY` | Eigener Schlüssel (mind. 32 Zeichen) für die Verschlüsselung der Bank-Tokens. Ohne ihn wird das Auth-Secret verwendet. Bestehende Tokens werden beim nächsten Sync automatisch auf den neuen Schlüssel umgestellt | *(empfohlen)* |
 | `TOKEN_ENCRYPTION_KEY_PREVIOUS` | Vorheriger Schlüssel (kommagetrennt) während einer Schlüsselrotation | *(leer)* |
 | `CRON_SECRET` | Bearer-Token für `POST /api/cron/bank-sync` (mind. 32 Zeichen); ohne ihn ist der Endpunkt deaktiviert | *(leer)* |
+| `BANK_SYNC_AUTO_ENABLED` | `false` schaltet den automatischen Hintergrund-Abruf ab; manueller Sync und `POST /api/cron/bank-sync` funktionieren weiter | `true` |
+| `ENABLE_BANKING_REDIRECT_URL` | Abweichende Redirect-URL für die Bank-Freigabe. Muss exakt der im Enable-Banking-Konto registrierten URL entsprechen | `APP_URL` + `/api/bank-sync/callback` |
 | `BANK_SYNC_INTERVAL_MINUTES` | Intervall des Hintergrund-Syncs | `360` |
 | `BANK_SYNC_MAX_UNATTENDED_PER_DAY` | Maximale automatische Abrufe pro Konto und Tag (höchstens 4) | `4` |
 | `RATE_LIMIT_ENABLED` | IP-basiertes Rate-Limit für Anmeldung, 2FA und Passwortänderung (in der Datenbank gespeichert). In Produktion standardmäßig aktiv, `false` schaltet es ab | *(auto)* |
