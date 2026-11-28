@@ -6,6 +6,7 @@ import {
   type RecurringInterval,
 } from "@/lib/db/schema";
 import { and, eq, gte, isNull, ne } from "drizzle-orm";
+import { todayISO, shiftedLocalISODate } from "@/lib/format";
 
 /**
  * Erkennt wiederkehrende Abbuchungen (Abos, Verträge, Versicherungen) in den
@@ -112,7 +113,7 @@ export function detectSubscriptions(
     dismissedKeys?: Set<string>;
   } = {}
 ): SubscriptionSuggestion[] {
-  const today = options.today ?? new Date().toISOString().slice(0, 10);
+  const today = options.today ?? todayISO();
   const groups = new Map<string, DetectionTransaction[]>();
   for (const tx of txs) {
     const key = normalizeMerchant(tx.merchant, tx.description);
@@ -197,7 +198,7 @@ export function detectSubscriptions(
 
 /** Erkennt Abo-Vorschläge für einen Benutzer aus den letzten 15 Monaten. */
 export function getSubscriptionSuggestions(userId: string): SubscriptionSuggestion[] {
-  const since = new Date(Date.now() - 456 * 86400000).toISOString().slice(0, 10);
+  const since = shiftedLocalISODate(-456);
   const txs = db
     .select({
       date: transactions.date,

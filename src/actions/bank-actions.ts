@@ -37,6 +37,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import crypto from "node:crypto";
+import { todayISO } from "@/lib/format";
 
 const BILLING_DAY_ERROR = "Der Abrechnungstag muss zwischen 1 und 31 liegen.";
 const billingDaySchema = z.number({ error: BILLING_DAY_ERROR }).int(BILLING_DAY_ERROR).min(1, BILLING_DAY_ERROR).max(31, BILLING_DAY_ERROR);
@@ -602,7 +603,7 @@ export async function transferBetweenAccountsAction(
 
     const transferCategory = getOrCreateTransferCategory(user.id);
     const now = new Date();
-    const transferDate = input.date || now.toISOString().slice(0, 10);
+    const transferDate = input.date || todayISO();
     if (!transferCategory) {
       return { success: false, error: "Umbuchungs-Kategorie konnte nicht angelegt werden." };
     }
@@ -771,7 +772,7 @@ export async function reconcileAccountBalanceAction(rawInput: ReconcileBalanceIn
 
     const mode = input.mode || "adjustment_transaction";
     const now = new Date();
-    const bookingDate = input.date || now.toISOString().slice(0, 10);
+    const bookingDate = input.date || todayISO();
 
     if (mode === "adjustment_transaction") {
       // Passende Kategorie für Ausgleich / Sonstiges finden

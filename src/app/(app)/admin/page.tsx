@@ -16,6 +16,7 @@ import { getBankHealth, getHealthChecks } from "@/lib/system-health";
 import { getUpdateInfo } from "@/lib/update-check";
 import { AutoBackupSection } from "@/components/admin/auto-backup-section";
 import { getBackupDir, listAutoBackups } from "@/lib/backup-scheduler";
+import { toLocalISODate } from "@/lib/format";
 
 export default async function AdminPage() {
   const currentAdmin = await requireAdmin();
@@ -53,7 +54,7 @@ export default async function AdminPage() {
       email: u.email,
       role: u.role as "admin" | "user",
       banned: Boolean(u.banned),
-      createdAt: u.createdAt.toISOString().slice(0, 10),
+      createdAt: toLocalISODate(u.createdAt),
       txCount: txRes?.value ?? 0,
       fixedCount: fixedRes?.value ?? 0,
     };

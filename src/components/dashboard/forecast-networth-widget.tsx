@@ -1,4 +1,4 @@
-import { formatCents, formatDateDE } from "@/lib/format";
+import { formatCents, formatDateDE, shiftedLocalISODate } from "@/lib/format";
 import type { LiquidityForecast } from "@/lib/forecast";
 import { Amount, EmptyHint, Section } from "@/components/ui/finance";
 
@@ -50,7 +50,7 @@ export function ForecastNetWorthWidget({
   currentNetWorthCents: number;
 }) {
   const projected = forecast.projectedEndBalanceCents;
-  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const cutoff = shiftedLocalISODate(-30);
   const reference = history.find((p) => p.date >= cutoff);
   const change30 = reference ? currentNetWorthCents - reference.netWorthCents : null;
 

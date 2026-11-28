@@ -42,6 +42,8 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Tagesbudget und Prognose zählen Fixkosten, die die Bank schon vor dem Fälligkeitstag abgebucht hat, nicht mehr zusätzlich als anstehend.
 - Wöchentliche Fixkosten: Die Zahlung der Vorwoche gilt nicht mehr als Zahlung der aktuellen Woche (Abgleichfenster ±3 statt ±10 Tage).
 - Manuell geführte Fixkosten mit altem Fälligkeitsdatum verschwinden nicht mehr nach 60 Terminen aus Prognose und Kalender; der Kalender beachtet das Enddatum.
+- Datumsangaben richten sich nach der lokalen Zeitzone statt nach UTC. Vorher bekamen z. B. Umbuchungen und Saldo-Abgleiche kurz nach Mitternacht das Datum des Vortags, „Heute/Gestern“ in der Umsatzliste stimmte bis 1 bzw. 2 Uhr nicht, und der Budget-Hinweis am Monatsersten prüfte noch den Vormonat.
+- Das Docker-Image setzt `TZ=Europe/Berlin`; über `.env` änderbar.
 
 ## [1.2.1] – 2026-11-26
 

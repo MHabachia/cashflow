@@ -151,7 +151,7 @@ export function FixedCostsView({
   }, [items]);
 
   const currentMonthPrefix = useMemo(
-    () => new Date().toISOString().slice(0, 7),
+    () => todayISO().slice(0, 7),
     []
   );
 

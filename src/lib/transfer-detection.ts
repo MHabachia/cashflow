@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { categories, transactions } from "@/lib/db/schema";
 import { and, eq, gte, isNotNull, ne } from "drizzle-orm";
 import crypto from "node:crypto";
+import { shiftedLocalISODate } from "@/lib/format";
 
 /**
  * Erkennung von Umbuchungen zwischen eigenen Konten.
@@ -90,7 +91,7 @@ export function pairTransfers(candidates: TransferCandidate[]): Array<[string, s
  * Gibt die Anzahl der markierten Paare zurück.
  */
 export function detectOwnAccountTransfers(userId: string, sinceDate?: string): number {
-  const since = sinceDate ?? new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  const since = sinceDate ?? shiftedLocalISODate(-60);
   const rows = db
     .select({
       id: transactions.id,

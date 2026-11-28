@@ -5,7 +5,7 @@ import {
   passkey as passkeyTable,
 } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { formatDateDE } from "@/lib/format";
+import { formatDateDE, toLocalISODate } from "@/lib/format";
 import { UserProfileEditor } from "@/components/settings/user-profile-editor";
 import { PasswordChangeCard } from "@/components/settings/password-change-card";
 import { RecoveryCodesCard } from "@/components/settings/recovery-codes-card";
@@ -60,7 +60,7 @@ export default async function SettingsPage() {
           id: s.id,
           userAgent: s.userAgent,
           ipAddress: s.ipAddress,
-          createdAt: formatDateDE(s.createdAt.toISOString().slice(0, 10)),
+          createdAt: formatDateDE(toLocalISODate(s.createdAt)),
           isCurrent: s.id === currentSession?.session?.id,
         }))}
       />
@@ -73,7 +73,7 @@ export default async function SettingsPage() {
           name: pk.name,
           deviceType: pk.deviceType,
           createdAt: pk.createdAt
-            ? formatDateDE(pk.createdAt.toISOString().slice(0, 10))
+            ? formatDateDE(toLocalISODate(pk.createdAt))
             : null,
         }))}
       />

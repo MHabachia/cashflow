@@ -5,6 +5,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt, am einfachsten in ei
 | Variable | Beschreibung | Standard |
 |---|---|---|
 | `AUTH_SECRET` / `BETTER_AUTH_SECRET` | Secret für Sitzungen (mind. 32 Zeichen, z. B. `openssl rand -base64 32`). Leer lassen: Der Container erzeugt beim ersten Start eines und speichert es in `/data/.auth-secret` | *(auto)* |
+| `TZ` | Zeitzone des Servers für „heute“, Monatsgrenzen und Fälligkeiten | `Europe/Berlin` |
 | `APP_URL` | Öffentliche Adresse der App, z. B. `https://cashflow.example.org` | `http://localhost:3000` |
 | `BIND_ADDRESS` | Nur `docker-compose.yml`: Adresse, an die Port 3000 gebunden wird. `0.0.0.0` für direkten Zugriff im Netzwerk | `127.0.0.1` |
 | `CASHFLOW_VERSION` | Nur `docker-compose.yml`: Image-Tag, z. B. `1.2.1` | `latest` |

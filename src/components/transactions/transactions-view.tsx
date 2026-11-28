@@ -18,6 +18,8 @@ import {
   formatCents,
   formatDateDE,
   PAYMENT_METHOD_LABELS,
+  todayISO,
+  shiftedLocalISODate,
 } from "@/lib/format";
 import { CategoryIcon } from "@/components/ui/category-icon";
 import {
@@ -74,8 +76,8 @@ interface TransactionRow {
 }
 
 function formatDateGroupHeader(dateStr: string): string {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = todayISO();
+  const yesterday = shiftedLocalISODate(-1);
 
   if (dateStr === today) {
     return `Heute (${formatDateDE(dateStr)})`;
@@ -103,7 +105,7 @@ export function TransactionsView({
   }>;
 }) {
   const searchParams = useSearchParams();
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const currentMonthPrefix = todayISO().slice(0, 7); // YYYY-MM (lokal)
 
   useEffect(() => {
     if (searchParams.get("quickAdd") === "1") {

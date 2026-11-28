@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { sendWebPush } from "@/lib/push/web-push";
 import { loadSplits, summarizeExpenses, toExpenseItems } from "@/lib/aggregation";
-import { formatCents } from "@/lib/format";
+import { formatCents, toLocalISODate, shiftedLocalISODate } from "@/lib/format";
 import { and, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
 
 /**
@@ -106,7 +106,7 @@ export async function notifyUser(
 }
 
 function monthPrefix(now: Date) {
-  return now.toISOString().slice(0, 7);
+  return toLocalISODate(now).slice(0, 7);
 }
 
 /** Budget zu 80 % bzw. 100 % ausgeschöpft (einmal pro Monat und Stufe). */
@@ -185,14 +185,14 @@ async function checkBudgets(userId: string, now: Date, sender?: Sender) {
 
 /** Bank-Zustimmung läuft in ≤ 7 Tagen ab oder ist abgelaufen. */
 async function checkConsents(userId: string, now: Date, sender?: Sender) {
-  const soon = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  const soon = shiftedLocalISODate(7, now);
   const banks = db
     .select()
     .from(connectedBanks)
     .where(and(eq(connectedBanks.userId, userId), lt(connectedBanks.consentExpiresAt, soon)))
     .all();
   for (const bank of banks) {
-    const expired = bank.status === "expired" || bank.consentExpiresAt < now.toISOString().slice(0, 10);
+    const expired = bank.status === "expired" || bank.consentExpiresAt < toLocalISODate(now);
     await notifyUser(
       userId,
       {
@@ -255,7 +255,7 @@ async function checkInbox(userId: string, now: Date, sender?: Sender) {
       url: "/inbox",
       tag: "inbox",
     },
-    { dedupeKey: `inbox:${now.toISOString().slice(0, 10)}`, sender }
+    { dedupeKey: `inbox:${toLocalISODate(now)}`, sender }
   );
 }
 

@@ -5,7 +5,7 @@ import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { X, ArrowRightLeft, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { transferBetweenAccountsAction } from "@/actions/bank-actions";
-import { parseEuroToCents, formatCents } from "@/lib/format";
+import { parseEuroToCents, formatCents, todayISO } from "@/lib/format";
 import type { ConnectedAccountItem } from "./banking-hub-view";
 
 interface AccountTransferModalProps {
@@ -37,7 +37,7 @@ export function AccountTransferModal({
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`
       );
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       setDateInput(today);
       setDescriptionInput("Kartenausgleich / Umbuchung");
 
