@@ -6,6 +6,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Fixed
+- `npm run db:push` entfernt: Es hätte die Datenbank am Migrationsprotokoll vorbei an `schema.ts` angeglichen und dabei die Tabelle `schema_migrations` sowie zwei Indizes gelöscht. Schemaänderungen laufen nur über `src/lib/db/migrations.ts`. Das Schema deklariert jetzt alle Indizes, ein Test prüft Schema und Migrationen auf Übereinstimmung.
+
 ## [1.3.0] – 2026-11-28
 
 Kartenausgleich für manuelle Kreditkarten, Sicherheits-Härtung und Rechenfehler behoben. Enthält die Datenbank-Migrationen 10 und 11: vor dem Update eine Sicherung anlegen.
