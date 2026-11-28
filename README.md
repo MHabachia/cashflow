@@ -26,7 +26,7 @@ Selbst gehostete Web-App (PWA) für Fixkosten, Einnahmen, Ausgaben und Konten.
 **Konten und Banken**
 - Bankanbindung über PSD2 (ING, Sparkasse, C24, Commerzbank u. a.), nur lesend.
 - Manuelle Konten, Kreditkarten und Bargeld, mit Salden und Umbuchungen.
-- Umbuchungen zwischen eigenen Konten werden erkannt und zählen nicht als Ausgabe.
+- Umbuchungen zwischen eigenen Konten werden erkannt und zählen nicht als Ausgabe. Von Hand geänderte Kategorien bleiben dabei erhalten.
 - Manuelle Kreditkarten lassen sich mit dem Girokonto verknüpfen: Der Kartenausgleich passt den Kartensaldo automatisch an.
 - Umsätze prüfen: neue Buchungen landen zuerst in einer Prüfliste.
 

@@ -22,6 +22,14 @@ Cashflow kann Bankbuchungen und Kreditkartenumsätze über PSD2 (Enable Banking)
 4. Nach erfolgreicher Freigabe leitet die Bank zurück auf Cashflow (`/api/bank-sync/callback`). Die Konten und Karten werden angelegt.
 5. Über **„Alle synchronisieren“** oder den Sync-Button am jeweiligen Konto werden neue Umsätze abgerufen, idempotent dedupliziert und automatisch bestehenden Fixkosten-Verträgen (Miete, Strom, Abos) bzw. Kategorien zugeordnet.
 
+## Umbuchungen und manuelle Zuordnung
+
+Nach jedem Abruf und Import sucht die App Umbuchungen zwischen deinen Konten: Eine Abbuchung und eine Gutschrift über denselben Betrag auf zwei verschiedenen Konten im Abstand von höchstens 3 Tagen werden als **Umbuchung & Ausgleich** markiert und zählen nicht als Ausgabe.
+
+Änderst du bei einer Buchung Kategorie oder Kostenart von Hand (Bearbeiten, Massenänderung, Umsätze prüfen), merkt sich die App das. Solche Buchungen und Buchungen, die mit Fixkosten verknüpft sind, werden bei späteren Abrufen nicht mehr als Umbuchung gepaart. Auch **Regeln anwenden** mit Überschreiben lässt sie unverändert und meldet, wie viele übersprungen wurden. Selbst angelegte Buchungen gelten immer als von Hand zugeordnet.
+
+Das gilt für Änderungen ab diesem Update (Migration 11); frühere Korrekturen kann die App nicht erkennen.
+
 ## Kartenausgleich für manuelle Kreditkarten
 
 Kreditkarten ohne PSD2-Zugang (z. B. Advanzia, TF Bank) führst du als manuelles Konto. Wird ihr Ausgleich von einem deiner Konten abgebucht, kann die App den Kartensaldo automatisch anpassen:

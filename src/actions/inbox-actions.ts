@@ -53,7 +53,13 @@ export async function confirmInboxTransactionAction(input: z.input<typeof confir
   let ruleCreated = false;
   db.transaction((t) => {
     t.update(transactions)
-      .set({ categoryId: targetCategoryId, reviewStatus: null, updatedAt: new Date() })
+      .set({
+        categoryId: targetCategoryId,
+        reviewStatus: null,
+        // Nur eine abweichende Kategorie ist eine manuelle Korrektur
+        ...(targetCategoryId !== tx.categoryId ? { manuallyClassified: true } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(transactions.id, tx.id))
       .run();
 
