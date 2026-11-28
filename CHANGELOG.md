@@ -6,6 +6,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Added
+- Kartenausgleich: Eine manuelle Kreditkarte lässt sich mit dem Konto verknüpfen, von dem ihr Ausgleich abgebucht wird. Abbuchungen mit dem Erkennungsbegriff werden als Umbuchung markiert, und der Kartensaldo steigt automatisch. Die spätere Zahlung im Kartenauszug wird nicht doppelt gebucht (siehe `docs/banking.md`).
+
 ### Changed
 - Hinweise (Toasts) bleiben 6 statt 4 Sekunden sichtbar.
 - `lucide-react` auf 1.x aktualisiert.

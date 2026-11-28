@@ -79,6 +79,9 @@ export interface ConnectedAccountItem {
   creditLimitCents?: number | null;
   billingDayOfMonth?: number | null;
   notes?: string | null;
+  /** Kartenausgleich: Konto, von dem der Ausgleich abgebucht wird */
+  settlementAccountId?: string | null;
+  settlementMatchPattern?: string | null;
   autoSync: boolean;
   /** Letzter Fehler beim automatischen Abruf (null = ok) */
   lastSyncError?: string | null;
@@ -754,6 +757,15 @@ export function BankingHubView({
                                       <span>Abrechnung: {account.billingDayOfMonth}. d. M.</span>
                                     </>
                                   )}
+                                  {account.settlementAccountId && (
+                                    <>
+                                      <span>•</span>
+                                      <span>
+                                        Ausgleich über{" "}
+                                        {allAccounts.find((a) => a.id === account.settlementAccountId)?.accountName ?? "Girokonto"}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1384,6 +1396,9 @@ export function BankingHubView({
           setAccountToEdit(null);
         }}
         accountToEdit={accountToEdit}
+        settlementAccountOptions={allAccounts
+          .filter((a) => a.accountType !== "credit_card")
+          .map((a) => ({ id: a.id, accountName: a.accountName }))}
       />
 
       {/* Modal: Kartenausgleich / Umbuchung zwischen Konten */}

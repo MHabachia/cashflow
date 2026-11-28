@@ -8,7 +8,13 @@ import {
   createManualBankAccountAction,
   updateBankAccountAction,
   deleteBankAccountAction,
+  previewCardSettlementAction,
 } from "@/actions/bank-actions";
+import {
+  MIN_SETTLEMENT_PATTERN_LENGTH,
+  normalizeSettlementPattern,
+  suggestSettlementPattern,
+} from "@/lib/card-settlement-pattern";
 import { parseEuroToCents, centsToInput } from "@/lib/format";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { ConnectedAccountItem } from "./banking-hub-view";
@@ -17,12 +23,15 @@ interface ManualAccountModalProps {
   open: boolean;
   onClose: () => void;
   accountToEdit?: ConnectedAccountItem | null;
+  /** Konten, von denen ein Kartenausgleich abgebucht werden kann (keine Kreditkarten) */
+  settlementAccountOptions?: { id: string; accountName: string }[];
 }
 
 export function ManualAccountModal({
   open,
   onClose,
   accountToEdit,
+  settlementAccountOptions = [],
 }: ManualAccountModalProps) {
   const [accountName, setAccountName] = useState("");
   const [accountType, setAccountType] = useState<
@@ -37,6 +46,42 @@ export function ManualAccountModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  // Kartenausgleich: Girokonto + Erkennungsbegriff, Vorschau der Treffer
+  const [settlementAccountId, setSettlementAccountId] = useState("");
+  const [settlementPattern, setSettlementPattern] = useState("");
+  const [settlementPreview, setSettlementPreview] = useState<
+    { matchCount: number; examples: string[] } | null
+  >(null);
+
+  useEffect(() => {
+    setSettlementPreview(null);
+    if (
+      !open ||
+      !settlementAccountId ||
+      normalizeSettlementPattern(settlementPattern).length < MIN_SETTLEMENT_PATTERN_LENGTH
+    ) {
+      return;
+    }
+    // Kurz warten, damit nicht bei jedem Tastendruck abgefragt wird
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const res = await previewCardSettlementAction({ settlementAccountId, pattern: settlementPattern });
+      if (!cancelled && res.success) {
+        setSettlementPreview({ matchCount: res.matchCount, examples: res.examples });
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, settlementAccountId, settlementPattern]);
+
+  function handleSettlementAccountChange(id: string) {
+    setSettlementAccountId(id);
+    if (id && !settlementPattern.trim()) {
+      setSettlementPattern(suggestSettlementPattern(accountName));
+    }
+  }
 
   async function handleDeleteAccount() {
     if (!accountToEdit) return;
@@ -95,6 +140,8 @@ export function ManualAccountModal({
       );
       setIbanMasked(accountToEdit.ibanMasked || "");
       setNotes(accountToEdit.notes || "");
+      setSettlementAccountId(accountToEdit.settlementAccountId || "");
+      setSettlementPattern(accountToEdit.settlementMatchPattern || "");
     } else {
       setAccountName("");
       setAccountType("credit_card");
@@ -104,6 +151,8 @@ export function ManualAccountModal({
       setBillingDayInput("8");
       setIbanMasked("");
       setNotes("");
+      setSettlementAccountId("");
+      setSettlementPattern("");
     }
   }, [accountToEdit, open]);
 
@@ -168,6 +217,8 @@ export function ManualAccountModal({
           balanceCents: parsedBalance,
           creditLimitCents: accountType === "credit_card" ? parsedLimit : null,
           billingDayOfMonth: accountType === "credit_card" ? parsedBillingDay : null,
+          settlementAccountId: accountType === "credit_card" && settlementAccountId ? settlementAccountId : null,
+          settlementMatchPattern: accountType === "credit_card" && settlementAccountId ? settlementPattern : null,
           ibanMasked: ibanMasked.trim() || null,
           notes: notes.trim() || null,
         });
@@ -185,6 +236,8 @@ export function ManualAccountModal({
           balanceCents: parsedBalance,
           creditLimitCents: accountType === "credit_card" ? parsedLimit : null,
           billingDayOfMonth: accountType === "credit_card" ? parsedBillingDay : null,
+          settlementAccountId: accountType === "credit_card" && settlementAccountId ? settlementAccountId : null,
+          settlementMatchPattern: accountType === "credit_card" && settlementAccountId ? settlementPattern : null,
           ibanMasked: ibanMasked.trim() || null,
           notes: notes.trim() || null,
         });
@@ -398,6 +451,64 @@ export function ManualAccountModal({
                     {creditLimitInput.trim() ? `${creditLimitInput} €` : "—"}
                   </span>
                 </div>
+              </div>
+
+              {/* Kartenausgleich vom Girokonto */}
+              <div className="space-y-2 rounded-xl border border-amber-500/20 bg-white/80 dark:bg-zinc-900/80 p-3">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Ausgleich vom Girokonto (optional)
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Wird der Kartenbetrag von einem deiner Konten abgebucht, erhöht die App den Kartensaldo
+                  automatisch, sobald die Abbuchung dort ankommt. Gilt ab dem Speichern.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="settlement-account" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Ausgleichskonto
+                    </label>
+                    <select
+                      id="settlement-account"
+                      value={settlementAccountId}
+                      onChange={(e) => handleSettlementAccountChange(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden transition"
+                    >
+                      <option value="">Keins</option>
+                      {settlementAccountOptions
+                        .filter((a) => a.id !== accountToEdit?.id)
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.accountName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="settlement-pattern" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Erkennungsbegriff im Buchungstext
+                    </label>
+                    <input
+                      id="settlement-pattern"
+                      type="text"
+                      value={settlementPattern}
+                      disabled={!settlementAccountId}
+                      onChange={(e) => setSettlementPattern(e.target.value)}
+                      placeholder="z. B. advanzia"
+                      className="w-full px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden transition disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                {settlementAccountId && (
+                  <p className="text-xs text-zinc-500" aria-live="polite">
+                    {normalizeSettlementPattern(settlementPattern).length < MIN_SETTLEMENT_PATTERN_LENGTH
+                      ? `Mindestens ${MIN_SETTLEMENT_PATTERN_LENGTH} Zeichen.`
+                      : settlementPreview
+                        ? `Trifft ${settlementPreview.matchCount} Abbuchung${settlementPreview.matchCount === 1 ? "" : "en"} der letzten 90 Tage${
+                            settlementPreview.examples.length > 0 ? `, z. B. „${settlementPreview.examples[0]}“` : ""
+                          }.`
+                        : "Prüfe Treffer …"}
+                  </p>
+                )}
               </div>
 
               <div>
