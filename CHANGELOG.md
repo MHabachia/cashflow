@@ -7,6 +7,7 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 ## [Unreleased]
 
 ### Changed
+- CI: Fehlerprotokolle der E2E-Tests (`test-results/`) werden 7 Tage als Artefakt aufbewahrt, auch wenn ein Test erst bei der Wiederholung bestanden hat.
 - Die Umsatzliste lädt nur noch die Buchungen des gewählten Monats statt der ganzen Historie; der Monat steht in der Adresse (`?month=2026-11`, `?month=all` für alle Monate). Die Offline-Ansicht speichert weiterhin die neuesten Buchungen.
 - Monats- und Jahresabfragen (Monatsabschluss, Budget-Hinweise, Jahresbericht, CSV-Export nach Jahr) filtern über einen Datumsbereich statt über `substr(date, …)` und können dadurch den Index auf Benutzer und Datum nutzen.
 - Die Duplikatsuche vergleicht nur noch Buchungen mit gleichem Betrag und Typ innerhalb des 3-Tage-Fensters statt jede mit jeder. Bei 50.000 Buchungen sinkt die Laufzeit von rund 8,8 s auf rund 0,1 s, das Ergebnis bleibt gleich.
