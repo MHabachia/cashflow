@@ -12,6 +12,7 @@ import { sendWebPush } from "@/lib/push/web-push";
 import { loadSplits, summarizeExpenses, toExpenseItems } from "@/lib/aggregation";
 import { formatCents, toLocalISODate, shiftedLocalISODate } from "@/lib/format";
 import { and, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
+import { monthRange } from "@/lib/date-range";
 
 /**
  * Push-Benachrichtigungen: Versand an alle Geräte eines Benutzers und
@@ -125,6 +126,7 @@ async function checkBudgets(userId: string, now: Date, sender?: Sender) {
     .all();
 
   // Ausgaben des Monats nach denselben Regeln wie im Dashboard (Splits, Erstattungen)
+  const range = monthRange(month);
   const monthTx = db
     .select({
       id: transactions.id,
@@ -135,7 +137,13 @@ async function checkBudgets(userId: string, now: Date, sender?: Sender) {
       isSplit: transactions.isSplit,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, userId), sql`substr(${transactions.date}, 1, 7) = ${month}`))
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        gte(transactions.date, range.from),
+        lt(transactions.date, range.to)
+      )
+    )
     .all();
   const categoryTypes = new Map(
     db

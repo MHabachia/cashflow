@@ -1,7 +1,8 @@
 import { db } from "./db";
 import { isRefund, loadSplits, sumIncome, summarizeExpenses, toExpenseItems } from "@/lib/aggregation";
 import { transactions, categories } from "./db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lt, sql, desc } from "drizzle-orm";
+import { yearRange } from "@/lib/date-range";
 
 export interface MonthSummary {
   month: number;
@@ -76,7 +77,7 @@ export function getAnnualReportData(userId: string, targetYear: number): AnnualR
   const availableYears = Array.from(availableYearsSet).sort((a, b) => b - a);
 
   // 2. Transaktionen des Zieljahres laden
-  const yearPrefix = `${targetYear}-`;
+  const range = yearRange(targetYear);
   const txs = db
     .select({
       id: transactions.id,
@@ -91,7 +92,8 @@ export function getAnnualReportData(userId: string, targetYear: number): AnnualR
     .where(
       and(
         eq(transactions.userId, userId),
-        sql`substr(${transactions.date}, 1, 5) = ${yearPrefix}`
+        gte(transactions.date, range.from),
+        lt(transactions.date, range.to)
       )
     )
     .all();

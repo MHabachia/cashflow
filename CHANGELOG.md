@@ -7,6 +7,7 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 ## [Unreleased]
 
 ### Changed
+- Monats- und Jahresabfragen (Monatsabschluss, Budget-Hinweise, Jahresbericht, CSV-Export nach Jahr) filtern über einen Datumsbereich statt über `substr(date, …)` und können dadurch den Index auf Benutzer und Datum nutzen.
 - Die Duplikatsuche vergleicht nur noch Buchungen mit gleichem Betrag und Typ innerhalb des 3-Tage-Fensters statt jede mit jeder. Bei 50.000 Buchungen sinkt die Laufzeit von rund 8,8 s auf rund 0,1 s, das Ergebnis bleibt gleich.
 - Ungenutzten Code entfernt: die Komponenten `InviteManager` und `CsvManager`, das Tortendiagramm `CategoryDonutChart`, die Funktion `parsePdfStatement`, ungenutzte Berechnungen im Dashboard und den veralteten Ordner `drizzle/` (Stand 1.1.0; das Schema wird über `src/lib/db/migrations.ts` gepflegt).
 

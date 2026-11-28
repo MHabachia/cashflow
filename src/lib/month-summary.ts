@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { categories, transactions } from "@/lib/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import {
   loadSplits,
   sumIncome,
@@ -9,6 +9,7 @@ import {
   type AggregatableTx,
 } from "@/lib/aggregation";
 import { getInboxCount } from "@/lib/inbox";
+import { monthRange } from "@/lib/date-range";
 
 export interface CategoryMove {
   categoryId: string;
@@ -43,6 +44,7 @@ function monthKeyBefore(month: string): string {
 }
 
 function loadMonth(userId: string, month: string) {
+  const range = monthRange(month);
   const txs = db
     .select({
       id: transactions.id,
@@ -53,7 +55,13 @@ function loadMonth(userId: string, month: string) {
       isSplit: transactions.isSplit,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, userId), sql`substr(${transactions.date}, 1, 7) = ${month}`))
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        gte(transactions.date, range.from),
+        lt(transactions.date, range.to)
+      )
+    )
     .all() as AggregatableTx[];
   return txs;
 }
