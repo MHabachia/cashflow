@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { SlidersHorizontal, Check, RotateCcw, X, Eye, EyeOff } from "lucide-react";
 
 export type WidgetId =
@@ -131,6 +132,7 @@ export function DashboardWidgetSystem({ children }: { children: ReactNode }) {
     return initial;
   });
   const [modalOpen, setModalOpen] = useState(false);
+  const widgetDialog = useDialogA11y({ open: modalOpen, onClose: () => setModalOpen(false) });
 
   useEffect(() => {
     const open = () => setModalOpen(true);
@@ -215,14 +217,14 @@ export function DashboardWidgetSystem({ children }: { children: ReactNode }) {
       {/* Anpassungs-Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div {...widgetDialog.dialogProps} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                   <SlidersHorizontal className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
+                  <h3 id={widgetDialog.titleId} className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
                     Dashboard-Widgets & Ansicht anpassen
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">

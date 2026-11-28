@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -50,6 +51,8 @@ export function CommandBar({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Escape behandelt der Tastatur-Listener unten selbst (auch Cmd+K zum Umschalten)
+  const { dialogProps } = useDialogA11y({ open, onClose: () => setOpen(false), closeOnEscape: false });
 
   // Globaler Keyboard-Listener: Cmd+K / Ctrl+K & Event-Listener
   useEffect(() => {
@@ -326,6 +329,9 @@ export function CommandBar({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-14 sm:pt-20 px-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
       <div
+        {...dialogProps}
+        aria-labelledby={undefined}
+        aria-label="Befehlsleiste"
         className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-150"
         onKeyDown={handleKeyDownInBox}
       >

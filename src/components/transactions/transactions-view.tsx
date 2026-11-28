@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useTransition } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -378,6 +379,7 @@ export function TransactionsView({
 
   // Auto-Kategorisierungsregel Modal State
   const [ruleModalTx, setRuleModalTx] = useState<TransactionRow | null>(null);
+  const ruleDialog = useDialogA11y({ open: ruleModalTx !== null, onClose: () => setRuleModalTx(null) });
   const [rulePattern, setRulePattern] = useState("");
   const [ruleMatchField, setRuleMatchField] = useState<"all" | "merchant" | "description">("all");
   const [ruleCategoryId, setRuleCategoryId] = useState("");
@@ -1193,14 +1195,14 @@ export function TransactionsView({
       {/* Auto-Kategorisierungsregel Modal */}
       {ruleModalTx && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 duration-150">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl w-full max-w-md shadow-lg overflow-hidden flex flex-col">
+          <div {...ruleDialog.dialogProps} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl w-full max-w-md shadow-lg overflow-hidden flex flex-col">
             <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 flex items-center justify-center">
                   <ListFilter className="w-5 h-5" aria-hidden="true" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                  <h3 id={ruleDialog.titleId} className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
                     Regel erstellen
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { useRouter } from "next/navigation";
 import {
   saveCategoryAction,
@@ -129,6 +130,7 @@ export function CategoriesAndPresetsView({
     "variable" | "fixed" | "transfer"
   >("variable");
   const [showRuleForm, setShowRuleForm] = useState(false);
+  const ruleFormDialog = useDialogA11y({ open: showRuleForm, onClose: () => setShowRuleForm(false) });
   const [isApplyingRules, setIsApplyingRules] = useState(false);
   const [isSeedingRules, setIsSeedingRules] = useState(false);
 
@@ -1123,9 +1125,9 @@ export function CategoriesAndPresetsView({
           {/* Formular Modal für Regel */}
           {showRuleForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 duration-150">
-              <div className="w-full max-w-sm rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
+              <div {...ruleFormDialog.dialogProps} className="w-full max-w-sm rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <h3 id={ruleFormDialog.titleId} className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-blue-600" />
                     <span>{ruleId ? "Regel bearbeiten" : "Neue Auto-Regel"}</span>
                   </h3>
