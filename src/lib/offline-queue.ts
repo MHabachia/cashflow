@@ -1,12 +1,16 @@
 import { get, set, del } from "idb-keyval";
 import type { TransactionInput } from "@/actions/transaction-actions";
+import {
+  createClientTempId,
+  withRejection,
+  withRetry,
+  without,
+  type QueuedOfflineTransaction,
+} from "@/lib/offline-queue-state";
+
+export { createClientTempId, type QueuedOfflineTransaction };
 
 const OFFLINE_QUEUE_KEY = "kosten_offline_tx_queue_v1";
-
-export interface QueuedOfflineTransaction extends TransactionInput {
-  clientTempId: string;
-  queuedAt: string;
-}
 
 export async function getOfflineQueue(): Promise<QueuedOfflineTransaction[]> {
   if (typeof window === "undefined") return [];
@@ -24,9 +28,7 @@ export async function enqueueOfflineTransaction(
   const queue = await getOfflineQueue();
   const item: QueuedOfflineTransaction = {
     ...tx,
-    clientTempId:
-      tx.clientTempId ||
-      `offline_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    clientTempId: tx.clientTempId || createClientTempId(),
     queuedAt: new Date().toISOString(),
   };
   queue.push(item);
@@ -35,13 +37,27 @@ export async function enqueueOfflineTransaction(
   return item;
 }
 
-export async function removeOfflineTransactionFromQueue(
-  clientTempId: string
+async function updateQueue(
+  change: (queue: QueuedOfflineTransaction[]) => QueuedOfflineTransaction[]
 ): Promise<void> {
   const queue = await getOfflineQueue();
-  const next = queue.filter((i) => i.clientTempId !== clientTempId);
-  await set(OFFLINE_QUEUE_KEY, next);
+  await set(OFFLINE_QUEUE_KEY, change(queue));
   window.dispatchEvent(new CustomEvent("offline-queue-updated"));
+}
+
+/** Entfernt einen übertragenen oder vom Nutzer verworfenen Eintrag. */
+export async function removeOfflineTransactionFromQueue(clientTempId: string): Promise<void> {
+  await updateQueue((queue) => without(queue, clientTempId));
+}
+
+/** Vom Server abgelehnt: Eintrag behalten, aber nicht automatisch erneut senden. */
+export async function markOfflineTransactionRejected(clientTempId: string, reason: string): Promise<void> {
+  await updateQueue((queue) => withRejection(queue, clientTempId, reason));
+}
+
+/** Gibt einen abgelehnten Eintrag zum erneuten Senden frei. */
+export async function retryOfflineTransaction(clientTempId: string): Promise<void> {
+  await updateQueue((queue) => withRetry(queue, clientTempId));
 }
 
 const OFFLINE_RECENT_TX_KEY = "kosten_recent_tx_snapshot_v1";

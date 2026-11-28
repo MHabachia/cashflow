@@ -8,6 +8,8 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ### Fixed
 - `npm run db:push` entfernt: Es hätte die Datenbank am Migrationsprotokoll vorbei an `schema.ts` angeglichen und dabei die Tabelle `schema_migrations` sowie zwei Indizes gelöscht. Schemaänderungen laufen nur über `src/lib/db/migrations.ts`. Das Schema deklariert jetzt alle Indizes, ein Test prüft Schema und Migrationen auf Übereinstimmung.
+- Offline-Erfassung: Jede neue Buchung bekommt ihre Kennung vor dem ersten Senden. Ging die Antwort des Servers verloren, landete die schon gespeicherte Buchung vorher mit neuer Kennung in der Offline-Warteschlange und wurde beim Übertragen doppelt angelegt.
+- Vom Server abgelehnte Offline-Buchungen (z. B. weil die Kategorie gelöscht wurde) werden nicht mehr gelöscht. Sie bleiben auf dem Gerät, die Statusleiste zeigt sie mit Grund und bietet „Erneut senden“ und „Verwerfen“.
 
 ## [1.3.0] – 2026-11-28
 
