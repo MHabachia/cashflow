@@ -8,7 +8,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt, am einfachsten in ei
 | `TZ` | Zeitzone des Servers für „heute“, Monatsgrenzen und Fälligkeiten | `Europe/Berlin` |
 | `APP_URL` | Öffentliche Adresse der App, z. B. `https://cashflow.example.org` | `http://localhost:3000` |
 | `BIND_ADDRESS` | Nur `docker-compose.yml`: Adresse, an die Port 3000 gebunden wird. `0.0.0.0` für direkten Zugriff im Netzwerk | `127.0.0.1` |
-| `CASHFLOW_VERSION` | Nur `docker-compose.yml`: Image-Tag, z. B. `1.2.1` | `latest` |
+| `CASHFLOW_VERSION` | Nur `docker-compose.yml`: Image-Tag, z. B. `1.3.0` | `latest` |
 | `UPDATE_CHECK` | `false` schaltet den Update-Hinweis im Admin-Bereich ab | *(an)* |
 | `ALLOW_DEMO_SEED` | Erlaubt `npm run db:seed` mit `NODE_ENV=production` (nur für Tests) | *(aus)* |
 | `ENABLE_BANKING_APPLICATION_ID` | Anwendungs-ID für Enable Banking (Live-PSD2) | *(Optional)* |

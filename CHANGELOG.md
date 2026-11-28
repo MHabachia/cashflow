@@ -6,6 +6,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+## [1.3.0] – 2026-11-28
+
+Kartenausgleich für manuelle Kreditkarten, Sicherheits-Härtung und Rechenfehler behoben. Enthält die Datenbank-Migrationen 10 und 11: vor dem Update eine Sicherung anlegen.
+
 ### Added
 - Kartenausgleich: Eine manuelle Kreditkarte lässt sich mit dem Konto verknüpfen, von dem ihr Ausgleich abgebucht wird. Abbuchungen mit dem Erkennungsbegriff werden als Umbuchung markiert, und der Kartensaldo steigt automatisch. Die spätere Zahlung im Kartenauszug wird nicht doppelt gebucht (siehe `docs/banking.md`).
 
@@ -197,7 +201,8 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 - Next.js, TypeScript, SQLite mit Drizzle, Anmeldung mit Better Auth.
 - Kategorien und manuell erfasste Buchungen.
 
-[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/MHabachia/cashflow/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/MHabachia/cashflow/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/MHabachia/cashflow/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MHabachia/cashflow/releases/tag/v1.1.0
