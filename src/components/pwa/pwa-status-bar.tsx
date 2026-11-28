@@ -4,10 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import {
   claimLocalDataFor,
   getOfflineQueue,
+  markOfflineTransactionRejected,
   removeOfflineTransactionFromQueue,
+  retryOfflineTransaction,
+  type QueuedOfflineTransaction,
 } from "@/lib/offline-queue";
+import { pendingItems, rejectedItems, toTransactionInput } from "@/lib/offline-queue-state";
 import { createTransactionAction } from "@/actions/transaction-actions";
-import { WifiOff, CloudUpload, Share, PlusSquare, X } from "lucide-react";
+import { formatCents } from "@/lib/format";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { WifiOff, CloudUpload, Share, PlusSquare, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { SwUpdateNotifier } from "./sw-update-notifier";
@@ -15,38 +21,45 @@ import { SwUpdateNotifier } from "./sw-update-notifier";
 export function PwaStatusBar({ userId }: { userId: string }) {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
-  const [queueCount, setQueueCount] = useState(0);
+  const [queue, setQueue] = useState<QueuedOfflineTransaction[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [showIosInstallHint, setShowIosInstallHint] = useState(false);
+  const [discardCandidate, setDiscardCandidate] = useState<QueuedOfflineTransaction | null>(null);
+
+  const queueCount = pendingItems(queue).length;
+  const rejected = rejectedItems(queue);
 
   const refreshQueueCount = useCallback(async () => {
     const q = await getOfflineQueue();
-    setQueueCount(q.length);
-    return q;
+    setQueue(q);
+    return pendingItems(q);
   }, []);
 
   const syncOfflineQueue = useCallback(async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
-    const queue = await getOfflineQueue();
-    if (queue.length === 0) return;
+    const pending = pendingItems(await getOfflineQueue());
+    if (pending.length === 0) return;
 
     setSyncing(true);
     let syncedCount = 0;
 
-    for (const item of queue) {
+    for (const item of pending) {
       try {
-        const res = await createTransactionAction(item);
+        const res = await createTransactionAction(toTransactionInput(item));
         if (res.success) {
           await removeOfflineTransactionFromQueue(item.clientTempId);
           syncedCount++;
         } else {
           // Vom Server abgelehnt (z. B. Kategorie inzwischen gelöscht): nicht
-          // endlos erneut senden, sondern den Nutzer informieren
-          await removeOfflineTransactionFromQueue(item.clientTempId);
+          // endlos erneut senden, aber behalten, bis der Nutzer entscheidet
+          await markOfflineTransactionRejected(
+            item.clientTempId,
+            res.error || "unbekannter Fehler"
+          );
           toast.error(
             `Offline-Buchung „${item.description}“ konnte nicht übernommen werden: ${
               res.error || "unbekannter Fehler"
-            }`,
+            }. Sie bleibt gespeichert, bis du sie erneut sendest oder verwirfst.`,
             { duration: 15000 }
           );
         }
@@ -66,6 +79,22 @@ export function PwaStatusBar({ userId }: { userId: string }) {
       router.refresh();
     }
   }, [refreshQueueCount, router]);
+
+  const retryRejected = useCallback(
+    async (clientTempId: string) => {
+      await retryOfflineTransaction(clientTempId);
+      await refreshQueueCount();
+      await syncOfflineQueue();
+    },
+    [refreshQueueCount, syncOfflineQueue]
+  );
+
+  const confirmDiscard = useCallback(async () => {
+    if (!discardCandidate) return;
+    await removeOfflineTransactionFromQueue(discardCandidate.clientTempId);
+    setDiscardCandidate(null);
+    await refreshQueueCount();
+  }, [discardCandidate, refreshQueueCount]);
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -165,6 +194,69 @@ export function PwaStatusBar({ userId }: { userId: string }) {
           )}
         </div>
       )}
+
+      {rejected.length > 0 && (
+        <div
+          role="alert"
+          className="bg-red-500/10 border border-red-500/30 text-red-800 dark:text-red-300 px-4 py-2.5 rounded-2xl text-xs font-medium space-y-2"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              {rejected.length === 1
+                ? "1 Offline-Buchung wurde abgelehnt"
+                : `${rejected.length} Offline-Buchungen wurden abgelehnt`}
+            </span>
+          </div>
+          <ul className="divide-y divide-red-500/20">
+            {rejected.map((item) => (
+              <li
+                key={item.clientTempId}
+                className="py-2 flex flex-wrap items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">
+                    {item.description} · {formatCents(item.amountCents)}
+                  </p>
+                  <p className="opacity-80">{item.rejectionReason}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => retryRejected(item.clientTempId)}
+                    disabled={syncing || !isOnline}
+                    aria-label={`Offline-Buchung „${item.description}“ erneut senden`}
+                    className="min-h-11 px-3 rounded-lg bg-red-600 text-white font-semibold disabled:opacity-50"
+                  >
+                    Erneut senden
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiscardCandidate(item)}
+                    aria-label={`Offline-Buchung „${item.description}“ verwerfen`}
+                    className="min-h-11 px-3 rounded-lg border border-red-500/40 font-semibold"
+                  >
+                    Verwerfen
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={discardCandidate !== null}
+        title="Offline-Buchung verwerfen?"
+        message={
+          discardCandidate
+            ? `„${discardCandidate.description}“ (${formatCents(discardCandidate.amountCents)}) wird endgültig von diesem Gerät entfernt und nicht gebucht.`
+            : ""
+        }
+        confirmText="Verwerfen"
+        onConfirm={confirmDiscard}
+        onCancel={() => setDiscardCandidate(null)}
+      />
 
       {showIosInstallHint && (
         <div className="bg-white dark:bg-zinc-900 border border-blue-500/30 rounded-2xl p-3.5 shadow-sm flex items-start justify-between gap-3">

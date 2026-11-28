@@ -7,7 +7,7 @@ import {
   updateTransactionAction,
   type TransactionInput,
 } from "@/actions/transaction-actions";
-import { enqueueOfflineTransaction } from "@/lib/offline-queue";
+import { createClientTempId, enqueueOfflineTransaction } from "@/lib/offline-queue";
 import {
   centsToInput,
   formatCents,
@@ -266,6 +266,10 @@ export function QuickAddModal({
       presetId: selectedPresetId,
       saveAsPreset: !editTransaction && !selectedPresetId && saveAsPreset,
       savePresetWithAmount,
+      // Vor dem ersten Senden vergeben: Geht die Antwort verloren und landet die
+      // Buchung in der Offline-Queue, erkennt der Server sie beim erneuten
+      // Senden an derselben ID statt sie doppelt anzulegen
+      clientTempId: editTransaction ? undefined : createClientTempId(),
     };
 
     if (

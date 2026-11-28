@@ -47,7 +47,14 @@ export default function OfflineFallbackPage() {
               >
                 <div>
                   <p className="font-semibold">{q.description}</p>
-                  <p className="text-zinc-500">{formatDateDE(q.date)}</p>
+                  <p className="text-zinc-500">
+                    {formatDateDE(q.date)}
+                    {q.rejectedAt && (
+                      <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">
+                        · abgelehnt: {q.rejectionReason}
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <span className="font-bold">{formatCents(q.amountCents)}</span>
               </div>
