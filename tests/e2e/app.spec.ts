@@ -160,28 +160,8 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await expect(page.getByText("Bäcker & Kaffee")).toHaveCount(0);
   });
 
-  test("5. Dialoge sind zugänglich: Fokus im Dialog, Escape schließt, Fokus kehrt zurück", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', "admin@kosten.local");
-    await page.fill('input[type="password"]', "AdminPassword123!");
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL("/", { timeout: 15000 });
-
-    const trigger = page.getByRole("button", { name: /Dashboard anpassen|Anpassen/ }).first();
-    await trigger.click();
-    const dialog = page.getByRole("dialog", { name: "Dashboard-Widgets & Ansicht anpassen" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toHaveAttribute("aria-modal", "true");
-    // Fokus liegt im Dialog
-    await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-
-    await page.keyboard.press("Escape");
-    await expect(dialog).toBeHidden();
-    await expect(trigger).toBeFocused();
-  });
-
-  test("6. Löschen eines Sparziels fragt im App-Dialog nach statt per Browser-confirm", async ({ page }) => {
-    // Ein Browser-confirm() würde hier auffallen
+  test("5. Dialoge: Fokus, Escape und App-Rückfrage statt Browser-confirm", async ({ page }) => {
+    // Ein Login für beide Prüfungen: Die Anmeldung ist auf 5 Versuche pro Minute begrenzt (#57)
     const browserDialogs: string[] = [];
     page.on("dialog", (d) => {
       browserDialogs.push(d.message());
@@ -193,13 +173,20 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL("/", { timeout: 15000 });
 
-    // Sparziel-Widget ist standardmäßig ausgeblendet (frischer Browser-Kontext)
-    await page.getByRole("button", { name: /Dashboard anpassen|Anpassen/ }).first().click();
+    // Dialog: Fokus im Dialog, Escape schließt, Fokus zurück auf dem Auslöser
+    const trigger = page.getByRole("button", { name: /Dashboard anpassen|Anpassen/ }).first();
+    await trigger.click();
     const widgets = page.getByRole("dialog", { name: "Dashboard-Widgets & Ansicht anpassen" });
+    await expect(widgets).toBeVisible();
+    await expect(widgets).toHaveAttribute("aria-modal", "true");
+    await expect.poll(() => widgets.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    // Sparziel-Widget einschalten (standardmäßig ausgeblendet)
     await widgets.getByRole("button", { name: "Sparziele & Sinking Funds ein- oder ausschalten" }).click();
     await page.keyboard.press("Escape");
     await expect(widgets).toBeHidden();
+    await expect(trigger).toBeFocused();
 
+    // Rückfrage beim Löschen eines Sparziels im App-Dialog
     const goalName = `E2E Ziel ${Date.now()}`;
     await page.getByRole("button", { name: "Ziel anlegen" }).click();
     await page.fill('input[placeholder^="z. B. Notgroschen"]', goalName);
@@ -216,7 +203,10 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
 
     await page.getByRole("button", { name: `${goalName} löschen` }).click();
     await confirmDialog.getByRole("button", { name: "Löschen", exact: true }).click();
-    await expect(page.getByText(goalName)).toBeHidden({ timeout: 5000 });
+    await expect(confirmDialog).toBeHidden();
+    // Meldung zuerst prüfen: Zeigt bei einem Fehlschlag, ob der Server gelöscht hat
+    await expect(page.getByText("Sparziel gelöscht.")).toBeVisible();
+    await expect(page.getByText(goalName)).toBeHidden({ timeout: 10000 });
     expect(browserDialogs).toEqual([]);
   });
 });
