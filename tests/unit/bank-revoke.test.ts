@@ -106,6 +106,35 @@ describe("Bank trennen beendet die Session beim Anbieter", async () => {
   });
 });
 
+describe("Bank trennen: lokale Schritte in einer Transaktion", async () => {
+  it("lässt bei einem Fehler mittendrin Konten und Buchungen unverändert", async (t) => {
+    const { db, sqlite } = await import("../../src/lib/db/index");
+    const s = await import("../../src/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { encryptBankToken } = await import("../../src/lib/crypto/vault");
+    const { disconnectBankAction } = await import("../../src/actions/bank-actions");
+    const userId = "revoke-user";
+    const now = new Date();
+
+    db.insert(s.connectedBanks).values({ id: "bank-tx", userId, provider: "enable_banking", institutionId: "ING_DE", institutionName: "ING", encryptedAccessToken: encryptBankToken("session-tx", userId), consentId: "session-tx", consentExpiresAt: "2027-02-01", status: "active", createdAt: now, updatedAt: now }).run();
+    db.insert(s.bankAccounts).values({ id: "bank-tx-acc", userId, connectedBankId: "bank-tx", accountExternalId: "tx-ext", accountName: "Giro", accountType: "checking", currency: "EUR", balanceCents: 0, autoSync: false, createdAt: now, updatedAt: now }).run();
+    db.insert(s.categories).values({ id: "cat-tx", userId, name: "X", type: "expense", createdAt: now }).run();
+    db.insert(s.transactions).values({ id: "tx-linked", userId, categoryId: "cat-tx", type: "expense", costType: "variable", amountCents: 100, date: "2026-11-01", description: "x", bankAccountId: "bank-tx-acc", createdAt: now, updatedAt: now }).run();
+
+    // Letzter Schritt (Bankverbindung löschen) scheitert, nachdem Buchungen entkoppelt und Konten gelöscht wurden
+    sqlite.exec(`CREATE TRIGGER fail_bank_delete BEFORE DELETE ON connected_banks WHEN OLD.id = 'bank-tx' BEGIN SELECT RAISE(ABORT, 'Testfehler'); END;`);
+    t.after(() => sqlite.exec("DROP TRIGGER IF EXISTS fail_bank_delete"));
+    t.mock.method(console, "error", () => {});
+
+    const res = await disconnectBankAction("bank-tx");
+
+    assert.equal(res.success, false);
+    assert.ok(db.select().from(s.connectedBanks).where(eq(s.connectedBanks.id, "bank-tx")).get(), "Bankverbindung bleibt");
+    assert.ok(db.select().from(s.bankAccounts).where(eq(s.bankAccounts.id, "bank-tx-acc")).get(), "Konto bleibt");
+    assert.equal(db.select().from(s.transactions).where(eq(s.transactions.id, "tx-linked")).get()?.bankAccountId, "bank-tx-acc", "Buchung bleibt verknüpft");
+  });
+});
+
 describe("Enable Banking: DELETE /sessions/{id}", () => {
   const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();

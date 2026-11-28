@@ -196,62 +196,66 @@ export async function disconnectBankAction(connectedBankId: string) {
       }
     }
 
-    // 1. Alle zugehörigen Konten ermitteln (für PSD2 oder manuelle Gruppe)
-    const accounts =
-      connectedBankId === "manual_banks_group"
-        ? db
-            .select({ id: bankAccounts.id })
-            .from(bankAccounts)
-            .where(
-              and(
-                isNull(bankAccounts.connectedBankId),
-                eq(bankAccounts.userId, user.id)
+    // Alle lokalen Schritte gemeinsam: Scheitert einer, bleibt alles unverändert
+    // statt halb gelöschter Konten oder einer Bankverbindung ohne Konten
+    db.transaction((tx) => {
+      // 1. Alle zugehörigen Konten ermitteln (für PSD2 oder manuelle Gruppe)
+      const accounts =
+        connectedBankId === "manual_banks_group"
+          ? tx
+              .select({ id: bankAccounts.id })
+              .from(bankAccounts)
+              .where(
+                and(
+                  isNull(bankAccounts.connectedBankId),
+                  eq(bankAccounts.userId, user.id)
+                )
               )
-            )
-            .all()
-        : db
-            .select({ id: bankAccounts.id })
-            .from(bankAccounts)
-            .where(
-              and(
-                eq(bankAccounts.connectedBankId, connectedBankId),
-                eq(bankAccounts.userId, user.id)
+              .all()
+          : tx
+              .select({ id: bankAccounts.id })
+              .from(bankAccounts)
+              .where(
+                and(
+                  eq(bankAccounts.connectedBankId, connectedBankId),
+                  eq(bankAccounts.userId, user.id)
+                )
               )
+              .all();
+
+      const accountIds = accounts.map((a) => a.id);
+
+      // 2. Transaktionen sicher entkoppeln
+      for (const accId of accountIds) {
+        tx.update(transactions)
+          .set({ bankAccountId: null })
+          .where(
+            and(
+              eq(transactions.bankAccountId, accId),
+              eq(transactions.userId, user.id)
             )
-            .all();
-
-    const accountIds = accounts.map((a) => a.id);
-
-    // 2. Transaktionen sicher entkoppeln
-    for (const accId of accountIds) {
-      db.update(transactions)
-        .set({ bankAccountId: null })
-        .where(
-          and(
-            eq(transactions.bankAccountId, accId),
-            eq(transactions.userId, user.id)
           )
-        )
-        .run();
+          .run();
 
-      db.delete(bankAccounts)
-        .where(
-          and(eq(bankAccounts.id, accId), eq(bankAccounts.userId, user.id))
-        )
-        .run();
-    }
-
-    // 3. Bankverbindung entfernen (nur bei echten PSD2 Banken)
-    if (connectedBankId !== "manual_banks_group") {
-      db.delete(connectedBanks)
-        .where(
-          and(
-            eq(connectedBanks.id, connectedBankId),
-            eq(connectedBanks.userId, user.id)
+        tx.delete(bankAccounts)
+          .where(
+            and(eq(bankAccounts.id, accId), eq(bankAccounts.userId, user.id))
           )
-        )
-        .run();
-    }
+          .run();
+      }
+
+      // 3. Bankverbindung entfernen (nur bei echten PSD2 Banken)
+      if (connectedBankId !== "manual_banks_group") {
+        tx.delete(connectedBanks)
+          .where(
+            and(
+              eq(connectedBanks.id, connectedBankId),
+              eq(connectedBanks.userId, user.id)
+            )
+          )
+          .run();
+      }
+    });
 
     safeRevalidatePath("/settings");
     safeRevalidatePath("/banking");
