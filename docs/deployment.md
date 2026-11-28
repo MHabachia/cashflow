@@ -23,7 +23,7 @@ Das fertige Image gibt es für `linux/amd64` und `linux/arm64` unter `ghcr.io/mh
    ```yaml
    services:
      cashflow:
-       image: ghcr.io/mhabachia/cashflow:1.2.1
+       image: ghcr.io/mhabachia/cashflow:1.3.0
        container_name: cashflow-app
        restart: unless-stopped
        ports:
@@ -79,7 +79,7 @@ Ohne geöffnete Ports, die App ist nur über den Tunnel erreichbar:
    ```yaml
    services:
      cashflow:
-       image: ghcr.io/mhabachia/cashflow:1.2.1
+       image: ghcr.io/mhabachia/cashflow:1.3.0
        container_name: cashflow-app
        restart: unless-stopped
        env_file: .env
@@ -110,7 +110,7 @@ Ohne geöffnete Ports, die App ist nur über den Tunnel erreichbar:
 
 1. **Vorher sichern** (siehe [Sicherung](backup.md)). Migrationen laufen beim Start automatisch und lassen sich nicht zurückdrehen.
 2. Den Changelog der neuen Version lesen, besonders Hinweise unter „Changed“ und „Security“.
-3. In Produktion eine feste Version verwenden (`ghcr.io/mhabachia/cashflow:1.2.1` bzw. `CASHFLOW_VERSION=1.2.1`) statt `latest` und bewusst hochziehen:
+3. In Produktion eine feste Version verwenden (`ghcr.io/mhabachia/cashflow:1.3.0` bzw. `CASHFLOW_VERSION=1.3.0`) statt `latest` und bewusst hochziehen:
 
    ```bash
    docker compose pull && docker compose up -d
