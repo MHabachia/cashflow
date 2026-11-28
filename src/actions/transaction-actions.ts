@@ -176,6 +176,8 @@ export async function createTransactionAction(input: TransactionInput) {
         presetId: usedPresetId,
         bankAccountId: data.bankAccountId || null,
         clientTempId: data.clientTempId || null,
+        // Von Hand erfasst: Kategorie und Kostenart hat der Nutzer gewählt
+        manuallyClassified: true,
         createdAt: now,
         updatedAt: now,
       })
@@ -240,6 +242,8 @@ export async function updateTransactionAction(input: TransactionInput) {
       amountCents: transactions.amountCents,
       type: transactions.type,
       isSplit: transactions.isSplit,
+      categoryId: transactions.categoryId,
+      costType: transactions.costType,
     })
     .from(transactions)
     .where(
@@ -264,6 +268,11 @@ export async function updateTransactionAction(input: TransactionInput) {
   if (oldRow.receiptPath && oldRow.receiptPath !== data.receiptPath) {
     removeReceiptFileFromDisk(user.id, oldRow.receiptPath);
   }
+
+  // Nur eine tatsächliche Änderung zählt als manuelle Zuordnung; reines
+  // Speichern ohne Änderung lässt die automatische Erkennung weiter zu
+  const classificationChanged =
+    data.categoryId !== oldRow.categoryId || data.costType !== oldRow.costType;
 
   db.transaction((tx) => {
     // Kontostand um die Differenz korrigieren, wenn Betrag oder Typ geändert wurden.
@@ -306,6 +315,7 @@ export async function updateTransactionAction(input: TransactionInput) {
       merchant: data.merchant?.trim() || null,
       paymentMethod: data.paymentMethod,
       receiptPath: data.receiptPath ?? null,
+      ...(classificationChanged ? { manuallyClassified: true } : {}),
       updatedAt: new Date(),
     })
     .where(
@@ -413,6 +423,7 @@ export async function batchUpdateTransactionsAction(rawInput: {
     }
 
     const payload: Record<string, unknown> = {
+      manuallyClassified: true,
       updatedAt: new Date(),
     };
     if (input.categoryId) payload.categoryId = input.categoryId;

@@ -711,6 +711,18 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 11,
+    name: "transactions_manually_classified",
+    up: (sqlite) => {
+      // Kennzeichen für vom Nutzer gesetzte Kategorie/Kostenart. Bestehende
+      // Buchungen starten mit 0: frühere Korrekturen sind nicht erkennbar.
+      const cols = sqlite.prepare("PRAGMA table_info(transactions)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "manually_classified")) {
+        sqlite.exec("ALTER TABLE transactions ADD COLUMN manually_classified INTEGER DEFAULT 0 NOT NULL;");
+      }
+    },
+  },
 ];
 
 /**

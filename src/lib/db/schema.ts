@@ -417,6 +417,9 @@ export const transactions = sqliteTable(
     }),
     bankTransactionId: text("bank_transaction_id"),
     isSplit: integer("is_split", { mode: "boolean" }).notNull().default(false),
+    // Kategorie oder Kostenart vom Nutzer gesetzt: Umbuchungs-Erkennung und
+    // Regeln überschreiben die Buchung dann nicht mehr
+    manuallyClassified: integer("manually_classified", { mode: "boolean" }).notNull().default(false),
     clientTempId: text("client_temp_id"), // Für Offline-Sync Deduplizierung
     // null = geprüft/manuell erfasst, "pending" = importiert, wartet auf Prüfung (Inbox)
     reviewStatus: text("review_status", { enum: ["pending"] }),

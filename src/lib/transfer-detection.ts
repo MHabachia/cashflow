@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { categories, transactions } from "@/lib/db/schema";
-import { and, eq, gte, isNotNull, ne } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 import crypto from "node:crypto";
 import { shiftedLocalISODate } from "@/lib/format";
 
@@ -88,6 +88,9 @@ export function pairTransfers(candidates: TransferCandidate[]): Array<[string, s
 
 /**
  * Markiert erkannte Umbuchungen eines Benutzers ab `sinceDate`.
+ * Vom Nutzer zugeordnete Buchungen und Fixkosten-Buchungen bleiben außen vor:
+ * Die Erkennung läuft nach jedem Abruf und Import erneut und würde sonst
+ * manuelle Korrekturen und die Verknüpfung mit Fixkosten wieder überschreiben.
  * Gibt die Anzahl der markierten Paare zurück.
  */
 export function detectOwnAccountTransfers(userId: string, sinceDate?: string): number {
@@ -105,6 +108,8 @@ export function detectOwnAccountTransfers(userId: string, sinceDate?: string): n
       and(
         eq(transactions.userId, userId),
         ne(transactions.costType, "transfer"),
+        eq(transactions.manuallyClassified, false),
+        isNull(transactions.recurringId),
         isNotNull(transactions.bankAccountId),
         gte(transactions.date, since)
       )
@@ -121,7 +126,7 @@ export function detectOwnAccountTransfers(userId: string, sinceDate?: string): n
     for (const [outId, inId] of pairs) {
       for (const id of [outId, inId]) {
         tx.update(transactions)
-          .set({ costType: "transfer", categoryId: transferCategory.id, recurringId: null, updatedAt: now })
+          .set({ costType: "transfer", categoryId: transferCategory.id, updatedAt: now })
           .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
           .run();
       }

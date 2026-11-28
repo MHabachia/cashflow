@@ -394,6 +394,7 @@ export async function applyCategoryRulesAction(options?: ApplyCategoryRulesOptio
         categoryId: transactions.categoryId,
         description: transactions.description,
         merchant: transactions.merchant,
+        manuallyClassified: transactions.manuallyClassified,
       })
       .from(transactions)
       .where(eq(transactions.userId, user.id))
@@ -401,10 +402,17 @@ export async function applyCategoryRulesAction(options?: ApplyCategoryRulesOptio
 
     let matchedCount = 0;
     let skippedCount = 0;
+    let manualSkippedCount = 0;
     const now = new Date();
 
     db.transaction((tx) => {
       for (const t of userTx) {
+        // Vom Nutzer zugeordnete Buchungen bleiben immer unverändert, auch beim Überschreiben
+        if (t.manuallyClassified) {
+          manualSkippedCount++;
+          continue;
+        }
+
         // Prüfen, ob die Buchung bereits eine spezifische, manuelle Kategorie hat
         const currentCatName = t.categoryId ? catMap.get(t.categoryId) || "" : "";
         const isUncategorizedOrGeneric =
@@ -446,14 +454,19 @@ export async function applyCategoryRulesAction(options?: ApplyCategoryRulesOptio
     safeRevalidatePath("/categories");
     safeRevalidatePath("/tools");
 
-    const message = overwriteExisting
+    const baseMessage = overwriteExisting
       ? `${matchedCount} von ${userTx.length} Buchungen neu kategorisiert.`
       : `${matchedCount} Buchungen neu kategorisiert (${skippedCount} bestehende Kategorien geschützt & unverändert).`;
+    const message =
+      manualSkippedCount > 0
+        ? `${baseMessage} ${manualSkippedCount} von Hand zugeordnete Buchungen übersprungen.`
+        : baseMessage;
 
     return {
       success: true,
       matchedCount,
       skippedCount,
+      manualSkippedCount,
       totalChecked: userTx.length,
       message,
     };
