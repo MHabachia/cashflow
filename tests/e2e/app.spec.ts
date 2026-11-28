@@ -121,12 +121,15 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await page.click('button:has-text("Bäcker & Kaffee")');
     await page.fill('input[placeholder^="z. B. Bäcker"]', description);
     await page.click('button:has-text("Jetzt speichern")');
-    await expect(page.getByText("gespeichert").first()).toBeVisible();
+    // Dialog schließt erst nach erfolgreichem Speichern
+    await expect(page.getByRole("dialog", { name: "Buchung erfassen" })).toBeHidden({ timeout: 10000 });
 
     await page.goto("/transactions");
     const text = page.getByText(description, { exact: true });
     await expect(text).toBeVisible();
-    const row = text.locator('xpath=ancestor::div[.//button[@aria-label="Aktionen anzeigen"]][1]');
+    // Jede Zeile hat einen eigenen „Löschen“-Button (auf dem Handy erst nach „Aktionen anzeigen“ sichtbar);
+    // „Aktionen anzeigen“ selbst verschwindet nach dem Klick und taugt nicht zum Abgrenzen der Zeile
+    const row = text.locator('xpath=ancestor::div[.//button[@title="Löschen"]][1]');
     await row.getByRole("button", { name: "Aktionen anzeigen" }).click();
     await row.getByTitle("Löschen").click();
 
