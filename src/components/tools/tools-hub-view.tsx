@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -55,6 +56,7 @@ export function ToolsHubView({
   activeRulesCount?: number;
   isAdmin?: boolean;
 }) {
+  const { confirm, confirmDialog } = useConfirm();
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [format, setFormat] = useState<"pdf" | "csv">("pdf");
@@ -134,9 +136,7 @@ export function ToolsHubView({
     if (!file) return;
 
     if (
-      !confirm(
-        `ACHTUNG: Möchtest du das Backup „${file.name}“ wirklich wiederherstellen? Die Datei wird geprüft und beim nächsten Neustart der App eingespielt. Vorhandene Daten werden dann ersetzt (der aktuelle Stand wird vorher automatisch gesichert).`
-      )
+      !(await confirm({ title: "Sicherung wiederherstellen?", confirmText: "Wiederherstellen", variant: "warning", message: `ACHTUNG: Möchtest du das Backup „${file.name}“ wirklich wiederherstellen? Die Datei wird geprüft und beim nächsten Neustart der App eingespielt. Vorhandene Daten werden dann ersetzt (der aktuelle Stand wird vorher automatisch gesichert).` }))
     ) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
@@ -679,6 +679,7 @@ export function ToolsHubView({
           }
         }}
       />
+      {confirmDialog}
     </div>
   );
 }

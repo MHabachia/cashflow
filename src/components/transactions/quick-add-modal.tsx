@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import {
   createTransactionAction,
@@ -111,6 +112,7 @@ export function QuickAddModal({
   const [saveAsPreset, setSaveAsPreset] = useState(false);
   const [savePresetWithAmount, setSavePresetWithAmount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   const filteredCategories = categories.filter((c) => c.type === type);
 
@@ -721,11 +723,9 @@ export function QuickAddModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      !window.confirm(
-                        "Möchtest du das angehängte Belegfoto wirklich entfernen?"
-                      )
+                      !(await confirm({ title: "Belegfoto entfernen?", confirmText: "Entfernen", variant: "danger", message: "Möchtest du das angehängte Belegfoto wirklich entfernen?" }))
                     ) {
                       return;
                     }
@@ -765,6 +765,7 @@ export function QuickAddModal({
           </button>
         </form>
       </div>
+      {confirmDialog}
     </div>
   );
 }

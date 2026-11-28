@@ -2,6 +2,7 @@
 
 import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 import { useState, useRef } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -73,6 +74,7 @@ export function AdminDashboardView({
   users: AdminUserRow[];
   invitations: InviteRow[];
 }) {
+  const { confirm, confirmDialog } = useConfirm();
   const router = useRouter();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<"users" | "branding" | "invites">(
@@ -212,9 +214,7 @@ export function AdminDashboardView({
 
   async function handleResetLogo() {
     if (
-      !window.confirm(
-        "Möchtest du das individuelle Logo entfernen und das Standard-3D-Logo wiederherstellen?"
-      )
+      !(await confirm({ title: "Logo zurücksetzen?", confirmText: "Zurücksetzen", variant: "warning", message: "Möchtest du das individuelle Logo entfernen und das Standard-3D-Logo wiederherstellen?" }))
     ) {
       return;
     }
@@ -230,9 +230,7 @@ export function AdminDashboardView({
 
   async function handleResetAllBranding() {
     if (
-      !window.confirm(
-        "Möchtest du wirklich alle Branding- & App-Einstellungen (Name, Untertitel, Farbe, Logo & Optionen) auf den Standard zurücksetzen?"
-      )
+      !(await confirm({ title: "Branding zurücksetzen?", confirmText: "Zurücksetzen", variant: "warning", message: "Möchtest du wirklich alle Branding- & App-Einstellungen (Name, Untertitel, Farbe, Logo & Optionen) auf den Standard zurücksetzen?" }))
     ) {
       return;
     }
@@ -639,9 +637,7 @@ export function AdminDashboardView({
                         type="button"
                         onClick={async () => {
                           if (
-                            !window.confirm(
-                              `Möchtest du den Benutzer „${u.name}“ inkl. aller Buchungen und Belegfotos wirklich unwiderruflich löschen?`
-                            )
+                            !(await confirm({ title: "Benutzer löschen?", confirmText: "Löschen", variant: "danger", message: `Möchtest du den Benutzer „${u.name}“ inkl. aller Buchungen und Belegfotos wirklich unwiderruflich löschen?` }))
                           ) {
                             return;
                           }
@@ -1011,9 +1007,7 @@ export function AdminDashboardView({
                       type="button"
                       onClick={async () => {
                         if (
-                          !window.confirm(
-                            "Möchtest du diesen Einladungslink wirklich widerrufen?"
-                          )
+                          !(await confirm({ title: "Einladung widerrufen?", confirmText: "Widerrufen", variant: "danger", message: "Möchtest du diesen Einladungslink wirklich widerrufen?" }))
                         ) {
                           return;
                         }
@@ -1036,6 +1030,7 @@ export function AdminDashboardView({
           )}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

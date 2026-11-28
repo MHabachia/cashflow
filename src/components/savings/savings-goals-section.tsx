@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { formatCents, formatDateDE, parseEuroToCents } from "@/lib/format";
 import {
@@ -71,6 +72,7 @@ export function SavingsGoalsSection({
 }: {
   goals: SavingsGoalItem[];
 }) {
+  const { confirm, confirmDialog } = useConfirm();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<SavingsGoalItem | null>(null);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
@@ -208,7 +210,7 @@ export function SavingsGoalsSection({
   }
 
   async function handleDeleteGoal(goal: SavingsGoalItem) {
-    if (!confirm(`Sparziel „${goal.name}“ wirklich löschen?`)) return;
+    if (!(await confirm({ title: "Sparziel löschen?", confirmText: "Löschen", variant: "danger", message: `Sparziel „${goal.name}“ wirklich löschen?` }))) return;
     try {
       const res = await deleteSavingsGoalAction(goal.id);
       if (res.success) {
@@ -556,6 +558,7 @@ export function SavingsGoalsSection({
           </div>
         </div>
       )}
+      {confirmDialog}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useRouter } from "next/navigation";
 import {
   updateOwnProfileAction,
@@ -49,6 +50,7 @@ export function UserProfileEditor({
   role: string;
   sessions: SessionInfoItem[];
 }) {
+  const { confirm, confirmDialog } = useConfirm();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,9 +95,7 @@ export function UserProfileEditor({
 
   async function handleRemoveAvatar() {
     if (
-      !window.confirm(
-        "Möchtest du dein individuelles Profilbild wirklich entfernen?"
-      )
+      !(await confirm({ title: "Profilbild entfernen?", confirmText: "Entfernen", variant: "danger", message: "Möchtest du dein individuelles Profilbild wirklich entfernen?" }))
     ) {
       return;
     }
@@ -324,6 +324,7 @@ export function UserProfileEditor({
           ))}
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }
