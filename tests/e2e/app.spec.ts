@@ -105,4 +105,38 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await expect(page.getByText("API-Endpunkte")).toBeVisible();
     await expect(page.getByText("GitHub Repository")).toBeVisible();
   });
+
+  test("3. Löschen in der Umsatzliste blendet die Zeile sofort aus, „Rückgängig“ holt sie zurück", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "admin@kosten.local");
+    await page.fill('input[type="password"]', "AdminPassword123!");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL("/", { timeout: 15000 });
+
+    // Eigene Buchung mit eindeutigem Text über die Vorlage anlegen
+    const description = `E2E Löschtest ${Date.now()}`;
+    await page.click('button[aria-label="Schnellerfassung öffnen"]');
+    await page.click('button:has-text("Bäcker & Kaffee")');
+    await page.fill('input[placeholder^="z. B. Bäcker"]', description);
+    await page.click('button:has-text("Jetzt speichern")');
+    // Dialog schließt erst nach erfolgreichem Speichern
+    await expect(page.getByRole("dialog", { name: "Buchung erfassen" })).toBeHidden({ timeout: 10000 });
+
+    await page.goto("/transactions");
+    const text = page.getByText(description, { exact: true });
+    await expect(text).toBeVisible();
+    // Jede Zeile hat einen eigenen „Löschen“-Button (auf dem Handy erst nach „Aktionen anzeigen“ sichtbar);
+    // „Aktionen anzeigen“ selbst verschwindet nach dem Klick und taugt nicht zum Abgrenzen der Zeile
+    const row = text.locator('xpath=ancestor::div[.//button[@title="Löschen"]][1]');
+    await row.getByRole("button", { name: "Aktionen anzeigen" }).click();
+    await row.getByTitle("Löschen").click();
+
+    // Sofort ausgeblendet, nicht erst nach Ablauf der 6-Sekunden-Frist
+    await expect(text).toBeHidden({ timeout: 3000 });
+
+    await page.getByRole("button", { name: "Rückgängig" }).click();
+    await expect(page.getByText(description, { exact: true })).toBeVisible({ timeout: 3000 });
+  });
 });
