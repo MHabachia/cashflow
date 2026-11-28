@@ -6,6 +6,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Changed
+- Ungenutzten Code entfernt: die Komponenten `InviteManager` und `CsvManager`, das Tortendiagramm `CategoryDonutChart`, die Funktion `parsePdfStatement`, ungenutzte Berechnungen im Dashboard und den veralteten Ordner `drizzle/` (Stand 1.1.0; das Schema wird über `src/lib/db/migrations.ts` gepflegt).
+
 ### Fixed
 - `npm run db:push` entfernt: Es hätte die Datenbank am Migrationsprotokoll vorbei an `schema.ts` angeglichen und dabei die Tabelle `schema_migrations` sowie zwei Indizes gelöscht. Schemaänderungen laufen nur über `src/lib/db/migrations.ts`. Das Schema deklariert jetzt alle Indizes, ein Test prüft Schema und Migrationen auf Übereinstimmung.
 - Offline-Erfassung: Jede neue Buchung bekommt ihre Kennung vor dem ersten Senden. Ging die Antwort des Servers verloren, landete die schon gespeicherte Buchung vorher mit neuer Kennung in der Offline-Warteschlange und wurde beim Übertragen doppelt angelegt.

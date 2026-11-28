@@ -300,19 +300,6 @@ export function detectStatementBank(
  * Extrahiert den Text aus einer PDF-Datei und parst die Buchungen.
  * Verwendet unpdf (optimiert für Serverless, Node.js und Next.js ohne Worker- oder Canvas-Probleme).
  */
-export async function parsePdfStatement(
-  buffer: Buffer | Uint8Array,
-  fileName?: string
-): Promise<ParsedStatementTransaction[]> {
-  const { extractText } = await import("unpdf");
-  const res = await extractText(new Uint8Array(buffer));
-  const fullText = Array.isArray(res.text)
-    ? res.text.join("\n")
-    : String(res.text || "");
-
-  return parseStatementText(fullText);
-}
-
 export async function parsePdfStatementWithMetadata(
   buffer: Buffer | Uint8Array,
   fileName?: string

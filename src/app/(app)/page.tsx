@@ -113,7 +113,8 @@ export default async function DashboardPage({
 
   // Monatsauswahl früh auswerten, um nur den benötigten Zeitraum zu laden
   const nowForWindow = new Date();
-  const requestedMonth = (searchParams ? await searchParams : {})?.month;
+  const resolvedParams: { month?: string } = searchParams ? await searchParams : {};
+  const requestedMonth = resolvedParams.month;
   const windowAnchor =
     requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
       ? new Date(Number(requestedMonth.slice(0, 4)), Number(requestedMonth.slice(5, 7)) - 1, 1)
@@ -181,12 +182,11 @@ export default async function DashboardPage({
   const currentMonthPrefix = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
 
   // Optionaler Monats-Filter (z. B. ?month=2026-10)
-  const resolvedParams = searchParams ? await searchParams : {};
   let selectedYear = currentYear;
   let selectedMonth = currentMonth;
 
   if (
-    resolvedParams?.month &&
+    resolvedParams.month &&
     /^\d{4}-(0[1-9]|1[0-2])$/.test(resolvedParams.month)
   ) {
     const [y, m] = resolvedParams.month.split("-").map(Number);
@@ -288,19 +288,6 @@ export default async function DashboardPage({
     dailyBudgetCents = Math.round(availableAfterFixedCents / daysRemaining);
   }
 
-  // Gesamtsaldo aller verbundenen Bankkonten (getrennt nach liquiden Mitteln vs. Kreditkarten)
-  const liquidBalanceCents = userBankAccounts
-    .filter((acc) => acc.accountType !== "credit_card")
-    .reduce(
-      (sum, acc) => sum + (acc.balanceCents !== null ? acc.balanceCents : 0),
-      0
-    );
-  const creditDebtCents = userBankAccounts
-    .filter((acc) => acc.accountType === "credit_card")
-    .reduce(
-      (sum, acc) => sum + (acc.balanceCents !== null ? acc.balanceCents : 0),
-      0
-    );
   const totalBankBalanceCents = userBankAccounts.reduce(
     (sum, acc) => sum + (acc.balanceCents !== null ? acc.balanceCents : 0),
     0
@@ -378,7 +365,6 @@ export default async function DashboardPage({
 
   const budgetsExceeded = budgetStatuses.filter((b) => b.status === "exceeded").length;
   const budgetsWarning = budgetStatuses.filter((b) => b.status === "warning").length;
-  const budgetsHealthy = budgetStatuses.length - budgetsExceeded - budgetsWarning;
 
   const recentTransactions = allTransactions.slice(0, 6);
 

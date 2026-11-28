@@ -9,7 +9,6 @@ import {
   ListOrdered,
   Landmark,
   Plus,
-  Repeat,
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
