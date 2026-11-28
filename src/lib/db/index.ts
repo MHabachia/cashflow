@@ -36,6 +36,12 @@ sqlite.pragma("foreign_keys = ON");
 sqlite.pragma("synchronous = NORMAL");
 sqlite.pragma("busy_timeout = 30000");
 
+// lower() und LIKE in SQLite kennen Groß/Klein nur bei ASCII. Für die Suche
+// ("äpfel" findet "Äpfel") dieselbe Kleinschreibung wie in JavaScript.
+sqlite.function("lower_unicode", { deterministic: true }, (value: unknown) =>
+  value == null ? null : String(value).toLowerCase()
+);
+
 globalForDb.sqlite = sqlite;
 
 export const db = drizzle(sqlite, { schema });

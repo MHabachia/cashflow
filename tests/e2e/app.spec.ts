@@ -139,4 +139,24 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await page.getByRole("button", { name: "Rückgängig" }).click();
     await expect(page.getByText(description, { exact: true })).toBeVisible({ timeout: 3000 });
   });
+
+  test("4. Suche und Monatsfilter der Umsatzliste laufen über die Adresse und den Server", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "admin@kosten.local");
+    await page.fill('input[type="password"]', "AdminPassword123!");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL("/", { timeout: 15000 });
+
+    // Seed-Buchung „Frischeinkauf & Getränke“ über alle Monate suchen
+    await page.goto("/transactions?month=all");
+    await page.fill('input[placeholder^="Suche nach"]', "frischeinkauf");
+    await expect(page).toHaveURL(/q=frischeinkauf/, { timeout: 5000 });
+    await expect(page.getByText("Frischeinkauf & Getränke").first()).toBeVisible();
+    await expect(page.getByText("Bäcker & Kaffee")).toHaveCount(0);
+
+    // Direkter Aufruf mit Filtern in der Adresse liefert dasselbe Ergebnis
+    await page.goto("/transactions?month=all&q=frischeinkauf");
+    await expect(page.getByText("Frischeinkauf & Getränke").first()).toBeVisible();
+    await expect(page.getByText("Bäcker & Kaffee")).toHaveCount(0);
+  });
 });

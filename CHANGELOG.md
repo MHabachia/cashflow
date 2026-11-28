@@ -6,6 +6,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+### Changed
+- Umsatzliste: Suche, Filter, Summen und Anzahl berechnet der Server; die Liste lädt 100 Buchungen und weitere mit „Weitere Buchungen laden“, auch bei „Alle Monate“. Die Filter stehen in der Adresse (`?q=`, `category`, `costType`, `bankAccountId`) und lassen sich so teilen und mit Zurück wiederherstellen. „Alle auswählen“ erfasst alle Treffer (höchstens 5.000). Die Suche unterscheidet auch bei Umlauten nicht zwischen Groß- und Kleinschreibung. „Alle anzeigen“ entfällt.
+
 ## [1.3.1] – 2026-11-28
 
 Fehlerbehebungen für Offline-Erfassung und Umsatzliste, Widerruf der Bank-Zustimmung beim Trennen und schnellere Abfragen. Keine neue Datenbank-Migration.

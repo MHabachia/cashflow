@@ -14,6 +14,9 @@ import {
   applyCategoryRulesAction,
 } from "@/actions/category-rule-actions";
 import { saveRecentTransactionsSnapshot, type CachedTransactionSnapshot } from "@/lib/offline-queue";
+import { loadMoreTransactionsAction, listTransactionIdsAction } from "@/actions/transaction-list-actions";
+import { MAX_SELECTABLE_IDS, PAGE_SIZE } from "@/lib/transactions-list-constants";
+import type { TransactionListFilter, TransactionListSummary } from "@/lib/transactions-list";
 import { BANK_TRANSACTION_DELETE_ERROR } from "@/lib/transaction-messages";
 import {
   formatCents,
@@ -93,16 +96,21 @@ function formatDateGroupHeader(dateStr: string): string {
 
 export function TransactionsView({
   transactions,
-  selectedMonth,
+  filter,
+  summary,
+  nextCursor,
   availableMonths,
   recentTransactions,
   categories,
   presets,
   bankAccounts = [],
 }: {
-  /** Nur die Buchungen von `selectedMonth` (bzw. alle bei "all") */
+  /** Erste Seite der gefilterten Buchungen; weitere lädt „Weitere laden“ */
   transactions: TransactionRow[];
-  selectedMonth: string;
+  filter: TransactionListFilter;
+  /** Anzahl und Summen über alle Treffer, nicht nur die geladenen */
+  summary: TransactionListSummary;
+  nextCursor: string | null;
   availableMonths: string[];
   recentTransactions: CachedTransactionSnapshot[];
   categories: (CategoryItem & { isArchived?: boolean })[];
@@ -117,14 +125,31 @@ export function TransactionsView({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const [monthChangePending, startMonthChange] = useTransition();
+  const [filterChangePending, startFilterChange] = useTransition();
+  // Zuletzt an die URL gegebener Suchtext (siehe Suchfeld unten)
+  const lastSentSearch = useRef(filter.search);
 
-  // Der Monat steht in der URL, damit der Server nur diesen Monat lädt
-  function changeMonth(month: string) {
+  // Filter stehen in der URL, damit der Server filtert, zählt und summiert
+  function updateFilter(change: Partial<TransactionListFilter>, options: { replace?: boolean } = {}) {
+    const next = { ...filter, ...change };
     const params = new URLSearchParams(searchParams.toString());
     params.delete("quickAdd");
-    params.set("month", month);
-    startMonthChange(() => router.push(`${pathname}?${params.toString()}`));
+    params.set("month", next.month);
+    const setOrDelete = (key: string, value: string, empty: string) => {
+      if (value && value !== empty) params.set(key, value);
+      else params.delete(key);
+    };
+    lastSentSearch.current = next.search.trim();
+    setOrDelete("q", next.search.trim(), "");
+    setOrDelete("category", next.categoryId, "all");
+    setOrDelete("costType", next.costType, "all");
+    setOrDelete("bankAccountId", next.bankAccountId, "all");
+    const url = `${pathname}?${params.toString()}`;
+    startFilterChange(() => (options.replace ? router.replace(url) : router.push(url)));
+  }
+
+  function changeMonth(month: string) {
+    updateFilter({ month });
   }
 
   useEffect(() => {
@@ -141,61 +166,78 @@ export function TransactionsView({
     }
   }, [recentTransactions]);
 
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedCostType, setSelectedCostType] = useState<
-    "all" | "variable" | "fixed"
-  >("all");
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(
-    searchParams.get("bankAccountId") || "all"
-  );
-  // Filter über Seitenwechsel hinweg merken (nur für diese Browser-Sitzung)
-  const FILTER_KEY = "cashflow_tx_filters_v1";
-  const [filtersRestored, setFiltersRestored] = useState(false);
+  const selectedMonth = filter.month;
+  const selectedCategory = filter.categoryId;
+  const selectedCostType = filter.costType;
+  const selectedBankAccountId = filter.bankAccountId;
+  const setSelectedCategory = (categoryId: string) => updateFilter({ categoryId });
+  const setSelectedCostType = (costType: TransactionListFilter["costType"]) => updateFilter({ costType });
+  const setSelectedBankAccountId = (bankAccountId: string) => updateFilter({ bankAccountId });
+
+  // Suchfeld sofort aktualisieren, die Abfrage erst nach einer kurzen Pause
+  const [search, setSearch] = useState(filter.search);
   useEffect(() => {
+    // Nur Änderungen von außen übernehmen (Zurücksetzen, Wiederherstellen,
+    // Zurück-Taste); sonst würde ein verspätetes Ergebnis den neueren Text überschreiben
+    if (filter.search !== lastSentSearch.current) setSearch(filter.search);
+    lastSentSearch.current = filter.search;
+  }, [filter.search]);
+  const updateFilterRef = useRef(updateFilter);
+  updateFilterRef.current = updateFilter;
+  useEffect(() => {
+    if (search.trim() === filter.search) return;
+    const timer = setTimeout(() => updateFilterRef.current({ search }, { replace: true }), 300);
+    return () => clearTimeout(timer);
+  }, [search, filter.search]);
+
+  // Filter über Seitenwechsel hinweg merken (nur für diese Browser-Sitzung):
+  // Ohne Filter in der URL werden die gemerkten einmalig übernommen
+  const FILTER_KEY = "cashflow_tx_filters_v1";
+  const filtersRestored = useRef(false);
+  useEffect(() => {
+    if (filtersRestored.current) return;
+    filtersRestored.current = true;
+    const urlHasFilter = ["q", "category", "costType", "bankAccountId"].some((key) => searchParams.has(key));
+    if (urlHasFilter) return;
     try {
       const raw = sessionStorage.getItem(FILTER_KEY);
-      if (raw) {
-        const f = JSON.parse(raw) as {
-          search?: string;
-          category?: string;
-          costType?: "all" | "variable" | "fixed";
-          bankAccountId?: string;
-        };
-        if (f.search) setSearch(f.search);
-        if (f.category) setSelectedCategory(f.category);
-        if (f.costType) setSelectedCostType(f.costType);
-        if (f.bankAccountId && !searchParams.get("bankAccountId")) setSelectedBankAccountId(f.bankAccountId);
-      }
+      if (!raw) return;
+      const f = JSON.parse(raw) as {
+        search?: string;
+        category?: string;
+        costType?: "all" | "variable" | "fixed";
+        bankAccountId?: string;
+      };
+      const restored: Partial<TransactionListFilter> = {};
+      if (f.search) restored.search = f.search;
+      if (f.category && f.category !== "all") restored.categoryId = f.category;
+      if (f.costType === "variable" || f.costType === "fixed") restored.costType = f.costType;
+      if (f.bankAccountId && f.bankAccountId !== "all") restored.bankAccountId = f.bankAccountId;
+      if (Object.keys(restored).length > 0) updateFilterRef.current(restored, { replace: true });
     } catch {
       /* ungültiger Eintrag */
     }
-    setFiltersRestored(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
   useEffect(() => {
-    if (!filtersRestored) return;
     try {
       sessionStorage.setItem(
         FILTER_KEY,
         JSON.stringify({
-          search,
-          category: selectedCategory,
-          costType: selectedCostType,
-          bankAccountId: selectedBankAccountId,
+          search: filter.search,
+          category: filter.categoryId,
+          costType: filter.costType,
+          bankAccountId: filter.bankAccountId,
         })
       );
     } catch {
       /* Speicher nicht verfügbar */
     }
-  }, [filtersRestored, search, selectedCategory, selectedCostType, selectedBankAccountId]);
+  }, [filter.search, filter.categoryId, filter.costType, filter.bankAccountId]);
   const hasActiveFilters =
-    search !== "" || selectedCategory !== "all" || selectedCostType !== "all" || selectedBankAccountId !== "all";
+    filter.search !== "" || selectedCategory !== "all" || selectedCostType !== "all" || selectedBankAccountId !== "all";
   function resetFilters() {
     setSearch("");
-    setSelectedCategory("all");
-    setSelectedCostType("all");
-    setSelectedBankAccountId("all");
+    updateFilter({ search: "", categoryId: "all", costType: "all", bankAccountId: "all" });
   }
 
   const [editingTx, setEditingTx] = useState<EditableTransaction | null>(null);
@@ -208,20 +250,33 @@ export function TransactionsView({
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
 
-  // Inkrementelle Paginierung / Lazy Chunk Loading
-  const INITIAL_VISIBLE_COUNT = 30;
-  const CHUNK_SIZE = 30;
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
-
+  // Seitenweises Nachladen: Neue Daten vom Server (Filterwechsel, Änderungen)
+  // beginnen wieder mit der ersten Seite
+  const [loadedRows, setLoadedRows] = useState<TransactionRow[]>(transactions);
+  const [cursor, setCursor] = useState<string | null>(nextCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
   useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE_COUNT);
-  }, [
-    selectedMonth,
-    search,
-    selectedCategory,
-    selectedCostType,
-    selectedBankAccountId,
-  ]);
+    setLoadedRows(transactions);
+    setCursor(nextCursor);
+  }, [transactions, nextCursor]);
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await loadMoreTransactionsAction({ filter, cursor });
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
+      setLoadedRows((prev) => [...prev, ...res.rows]);
+      setCursor(res.nextCursor);
+    } catch {
+      toast.error("Weitere Buchungen konnten nicht geladen werden.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Batch-Auswahl State & Aktionen
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
@@ -236,11 +291,30 @@ export function TransactionsView({
     });
   }
 
-  function handleSelectAll() {
-    if (selectedTxIds.size === filteredTransactions.length) {
+  // „Alle auswählen“ gilt für alle Treffer, auch noch nicht geladene
+  const selectableCount = Math.min(summary.count, MAX_SELECTABLE_IDS);
+  const allSelected = selectableCount > 0 && selectedTxIds.size >= selectableCount;
+  const [selectingAll, setSelectingAll] = useState(false);
+  async function handleSelectAll() {
+    if (allSelected) {
       setSelectedTxIds(new Set());
-    } else {
-      setSelectedTxIds(new Set(filteredTransactions.map((t) => t.id)));
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const res = await listTransactionIdsAction({ filter });
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
+      setSelectedTxIds(new Set(res.ids));
+      if (summary.count > MAX_SELECTABLE_IDS) {
+        toast.info(`Ausgewählt sind die neuesten ${MAX_SELECTABLE_IDS} von ${summary.count} Buchungen.`);
+      }
+    } catch {
+      toast.error("Auswahl konnte nicht geladen werden.");
+    } finally {
+      setSelectingAll(false);
     }
   }
 
@@ -369,45 +443,12 @@ export function TransactionsView({
     [categories]
   );
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => {
-      if (pendingDeleteIds.has(tx.id)) return false;
-      if (selectedCategory !== "all" && tx.categoryId !== selectedCategory) {
-        return false;
-      }
-      if (selectedCostType !== "all" && tx.costType !== selectedCostType) {
-        return false;
-      }
-      if (selectedBankAccountId !== "all") {
-        if (selectedBankAccountId === "manual") {
-          if (tx.bankAccountId) return false;
-        } else if (tx.bankAccountId !== selectedBankAccountId) {
-          return false;
-        }
-      }
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        const catName = catMap[tx.categoryId]?.name?.toLowerCase() || "";
-        const matchDesc = tx.description.toLowerCase().includes(q);
-        const matchCat = catName.includes(q);
-        const matchBank = tx.bankAccountName?.toLowerCase().includes(q);
-        if (!matchDesc && !matchCat && !matchBank) return false;
-      }
-      return true;
-    });
-  }, [
-    transactions,
-    selectedCategory,
-    selectedCostType,
-    selectedBankAccountId,
-    search,
-    catMap,
-    pendingDeleteIds,
-  ]);
-
-  const displayedTransactions = useMemo(() => {
-    return filteredTransactions.slice(0, visibleCount);
-  }, [filteredTransactions, visibleCount]);
+  // Gefiltert hat der Server; hier nur noch zum Löschen vorgemerkte Zeilen ausblenden
+  const filteredTransactions = useMemo(
+    () => loadedRows.filter((tx) => !pendingDeleteIds.has(tx.id)),
+    [loadedRows, pendingDeleteIds]
+  );
+  const displayedTransactions = filteredTransactions;
 
   // Gruppierung nach Kalendertag für klare visuelle Trennung & Tagessummen
   const groupedTransactions = useMemo(() => {
@@ -440,35 +481,13 @@ export function TransactionsView({
     return groups;
   }, [displayedTransactions]);
 
-  const summary = useMemo(() => {
-    let variableExpenses = 0;
-    let fixedExpenses = 0;
-    let income = 0;
-
-    for (const tx of filteredTransactions) {
-      if (tx.type === "income") {
-        income += tx.amountCents;
-      } else if (tx.costType === "fixed") {
-        fixedExpenses += tx.amountCents;
-      } else {
-        variableExpenses += tx.amountCents;
-      }
-    }
-
-    return {
-      variableExpenses,
-      fixedExpenses,
-      totalExpenses: variableExpenses + fixedExpenses,
-      income,
-    };
-  }, [filteredTransactions]);
 
   // Einzelnes Löschen mit „Rückgängig“: Die Zeile verschwindet sofort, der
   // eigentliche Löschaufruf läuft erst nach Ablauf der Frist.
 
   function handleDelete(id: string) {
     setSwipedId(null);
-    if (transactions.find((t) => t.id === id)?.isBankSynced) {
+    if (loadedRows.find((t) => t.id === id)?.isBankSynced) {
       toast.error(BANK_TRANSACTION_DELETE_ERROR);
       return;
     }
@@ -571,7 +590,7 @@ export function TransactionsView({
           <div>
             <h1 className="text-base font-semibold">Umsätze</h1>
             <p className="text-xs text-zinc-500">
-              {filteredTransactions.length} Buchungen im gewählten Zeitraum
+              {summary.count} Buchungen im gewählten Zeitraum
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -710,9 +729,9 @@ export function TransactionsView({
           <select
             value={selectedMonth}
             onChange={(e) => changeMonth(e.target.value)}
-            disabled={monthChangePending}
+            disabled={filterChangePending}
             aria-label="Monat"
-            aria-busy={monthChangePending}
+            aria-busy={filterChangePending}
             className="px-2.5 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium disabled:opacity-60"
           >
             <option value="all">Alle Monate</option>
@@ -778,7 +797,7 @@ export function TransactionsView({
       </div>
 
       {/* Massen-Aktionsleiste oben: Alle auswählen & Direkte Batch-Aktionen */}
-      {filteredTransactions.length > 0 && (
+      {summary.count > 0 && (
         selectedTxIds.size === 0 ? (
           <div className="flex items-center justify-between px-3 py-2 text-xs text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/40 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60">
             <label className="flex items-center gap-2 cursor-pointer font-medium hover:text-zinc-900 dark:hover:text-zinc-200 transition">
@@ -786,9 +805,10 @@ export function TransactionsView({
                 type="checkbox"
                 checked={false}
                 onChange={handleSelectAll}
+                disabled={selectingAll}
                 className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
-              <span>Alle {filteredTransactions.length} Einträge auswählen</span>
+              <span>Alle {summary.count} Einträge auswählen</span>
             </label>
           </div>
         ) : (
@@ -796,11 +816,9 @@ export function TransactionsView({
             <div className="flex items-center gap-2.5">
               <input
                 type="checkbox"
-                checked={
-                  filteredTransactions.length > 0 &&
-                  selectedTxIds.size === filteredTransactions.length
-                }
+                checked={allSelected}
                 onChange={handleSelectAll}
+                disabled={selectingAll}
                 className="w-4 h-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 title="Alle auswählen / abwählen"
               />
@@ -1121,35 +1139,25 @@ export function TransactionsView({
               </div>
             ))}
 
-            {visibleCount < filteredTransactions.length && (
+            {cursor && (
               <div className="pt-4 pb-2 flex flex-col items-center gap-2">
                 <p className="text-xs text-zinc-500">
-                  Zeige {visibleCount} von {filteredTransactions.length} Buchungen
+                  Zeige {loadedRows.length} von {summary.count} Buchungen
                 </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount((prev) => prev + CHUNK_SIZE)}
-                    className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                    <span>
-                      Mehr Buchungen laden (+
-                      {Math.min(
-                        CHUNK_SIZE,
-                        filteredTransactions.length - visibleCount
-                      )}
-                      )
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount(filteredTransactions.length)}
-                    className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition"
-                  >
-                    Alle ({filteredTransactions.length}) anzeigen
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  aria-busy={loadingMore}
+                  className="min-h-11 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition disabled:opacity-60"
+                >
+                  <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                  <span>
+                    {loadingMore
+                      ? "Wird geladen …"
+                      : `Weitere ${Math.min(PAGE_SIZE, summary.count - loadedRows.length)} Buchungen laden`}
+                  </span>
+                </button>
               </div>
             )}
           </div>
