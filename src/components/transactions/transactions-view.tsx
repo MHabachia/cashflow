@@ -402,6 +402,7 @@ export function TransactionsView({
     selectedBankAccountId,
     search,
     catMap,
+    pendingDeleteIds,
   ]);
 
   const displayedTransactions = useMemo(() => {
