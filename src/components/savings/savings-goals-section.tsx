@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import { formatCents, formatDateDE, parseEuroToCents } from "@/lib/format";
 import {
   createSavingsGoalAction,
@@ -77,6 +78,8 @@ export function SavingsGoalsSection({
   const [adjustMode, setAdjustMode] = useState<"deposit" | "withdraw">("deposit");
   const [adjustAmountStr, setAdjustAmountStr] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const goalDialog = useDialogA11y({ open: modalOpen, onClose: () => setModalOpen(false) });
+  const adjustDialog = useDialogA11y({ open: adjustModalOpen, onClose: () => setAdjustModalOpen(false) });
 
   // Form State für Erstellen / Bearbeiten
   const [name, setName] = useState("");
@@ -381,9 +384,9 @@ export function SavingsGoalsSection({
       {/* Modal: Neues Sparziel / Sparziel bearbeiten */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 duration-150">
-          <div className="w-full max-w-sm rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
+          <div {...goalDialog.dialogProps} className="w-full max-w-sm rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+              <h3 id={goalDialog.titleId} className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
                 {editingGoal ? "Sparziel bearbeiten" : "Neues Sparziel anlegen"}
               </h3>
               <button
@@ -498,9 +501,9 @@ export function SavingsGoalsSection({
       {/* Modal: Einzahlen / Entnehmen */}
       {adjustModalOpen && selectedGoal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 duration-150">
-          <div className="w-full max-w-xs rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
+          <div {...adjustDialog.dialogProps} className="w-full max-w-xs rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-lg space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+              <h3 id={adjustDialog.titleId} className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
                 {adjustMode === "deposit" ? "Geld einzahlen" : "Geld entnehmen"}
               </h3>
               <button

@@ -159,4 +159,24 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await expect(page.getByText("Frischeinkauf & Getränke").first()).toBeVisible();
     await expect(page.getByText("Bäcker & Kaffee")).toHaveCount(0);
   });
+
+  test("5. Dialoge sind zugänglich: Fokus im Dialog, Escape schließt, Fokus kehrt zurück", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "admin@kosten.local");
+    await page.fill('input[type="password"]', "AdminPassword123!");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL("/", { timeout: 15000 });
+
+    const trigger = page.getByRole("button", { name: /Dashboard anpassen|Anpassen/ }).first();
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Dashboard-Widgets & Ansicht anpassen" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    // Fokus liegt im Dialog
+    await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
 });

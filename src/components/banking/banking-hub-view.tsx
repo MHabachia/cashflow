@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useDialogA11y } from "@/lib/use-dialog-a11y";
 import Link from "next/link";
 import {
   disconnectBankAction,
@@ -117,6 +118,8 @@ export function BankingHubView({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [liveInfoOpen, setLiveInfoOpen] = useState(false);
+  const connectDialog = useDialogA11y({ open: modalOpen, onClose: () => setModalOpen(false) });
+  const liveInfoDialog = useDialogA11y({ open: liveInfoOpen, onClose: () => setLiveInfoOpen(false) });
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<
     "all" | "giro" | "credit_card"
@@ -1064,11 +1067,11 @@ export function BankingHubView({
       {/* MODAL: Bank auswählen & verbinden */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 duration-150">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-lg overflow-hidden">
+          <div {...connectDialog.dialogProps} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-lg overflow-hidden">
             {/* Modal Header */}
             <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+                <h3 id={connectDialog.titleId} className="font-bold text-base text-zinc-900 dark:text-zinc-100">
                   Bank oder Kreditkarte verbinden
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -1233,14 +1236,14 @@ export function BankingHubView({
       {/* MODAL: Live-Modus aktivieren & API-Keys Anleitung */}
       {liveInfoOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 duration-150">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-lg overflow-hidden">
+          <div {...liveInfoDialog.dialogProps} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-lg overflow-hidden">
             <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 flex items-center justify-center shrink-0">
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+                  <h3 id={liveInfoDialog.titleId} className="font-bold text-base text-zinc-900 dark:text-zinc-100">
                     Live Open Banking (PSD2) aktivieren
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
