@@ -83,6 +83,20 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://localhost:3123
         run: npm run test:e2e
 
+      # Fehlerprotokolle (error-context.md, Traces) aufbewahren, auch wenn ein
+      # instabiler Test bei der Wiederholung bestanden hat und der Job grün ist.
+      # Ohne Fehler gibt es nichts hochzuladen; .last-run.json allein zählt nicht.
+      - name: Upload Playwright Test Results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-test-results
+          path: |
+            test-results/
+            !test-results/.last-run.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   docker-smoke-test:
     name: Docker Build & Container Smoke Test (/api/health)
     runs-on: ubuntu-latest
