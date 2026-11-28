@@ -101,7 +101,7 @@ export const passkey = sqliteTable("passkey", {
   transports: text("transports"),
   createdAt: integer("created_at", { mode: "timestamp" }),
   aaguid: text("aaguid"),
-});
+}, (table) => [index("idx_passkey_user").on(table.userId)]);
 
 // Rate-Limiting von Better Auth (storage: "database")
 export const rateLimit = sqliteTable("rate_limit", {
@@ -446,6 +446,7 @@ export const transactions = sqliteTable(
       table.bankAccountId,
       table.bankTransactionId
     ),
+    index("idx_transactions_review").on(table.userId, table.reviewStatus),
   ]
 );
 

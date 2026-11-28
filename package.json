@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/lib/db/migrate.ts",
-    "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "test:e2e": "playwright test",
