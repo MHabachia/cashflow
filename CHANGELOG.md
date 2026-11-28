@@ -10,6 +10,7 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Umsatzliste: Suche, Filter, Summen und Anzahl berechnet der Server; die Liste lädt 100 Buchungen und weitere mit „Weitere Buchungen laden“, auch bei „Alle Monate“. Die Filter stehen in der Adresse (`?q=`, `category`, `costType`, `bankAccountId`) und lassen sich so teilen und mit Zurück wiederherstellen. „Alle auswählen“ erfasst alle Treffer (höchstens 5.000). Die Suche unterscheidet auch bei Umlauten nicht zwischen Groß- und Kleinschreibung. „Alle anzeigen“ entfällt.
 
 ### Fixed
+- Rückfragen vor dem Löschen oder Zurücksetzen (Passkey, Profilbild, Sicherung wiederherstellen, Sparziel, Abmelden mit offenen Offline-Buchungen, Admin-Bereich, Belegfoto) erscheinen im App-Dialog statt im Browser-Fenster `confirm()`: einheitlich gestaltet, mit Fokus und Escape, gefährliche Aktionen rot markiert.
 - Barrierefreiheit: Alle Dialoge (u. a. Sparziele, Bank verbinden, Regeln, Dashboard-Anpassung, Befehlsleiste) sind für Screenreader als Dialog ausgezeichnet, halten den Fokus, schließen mit Escape und geben den Fokus beim Schließen an das auslösende Element zurück.
 
 ## [1.3.1] – 2026-11-28

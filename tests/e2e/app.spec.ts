@@ -179,4 +179,44 @@ test.describe("Cashflow PWA – UI & End-to-End Tests", () => {
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
   });
+
+  test("6. Löschen eines Sparziels fragt im App-Dialog nach statt per Browser-confirm", async ({ page }) => {
+    // Ein Browser-confirm() würde hier auffallen
+    const browserDialogs: string[] = [];
+    page.on("dialog", (d) => {
+      browserDialogs.push(d.message());
+      void d.dismiss();
+    });
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "admin@kosten.local");
+    await page.fill('input[type="password"]', "AdminPassword123!");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL("/", { timeout: 15000 });
+
+    // Sparziel-Widget ist standardmäßig ausgeblendet (frischer Browser-Kontext)
+    await page.getByRole("button", { name: /Dashboard anpassen|Anpassen/ }).first().click();
+    const widgets = page.getByRole("dialog", { name: "Dashboard-Widgets & Ansicht anpassen" });
+    await widgets.getByRole("button", { name: "Sparziele & Sinking Funds ein- oder ausschalten" }).click();
+    await page.keyboard.press("Escape");
+    await expect(widgets).toBeHidden();
+
+    const goalName = `E2E Ziel ${Date.now()}`;
+    await page.getByRole("button", { name: "Ziel anlegen" }).click();
+    await page.fill('input[placeholder^="z. B. Notgroschen"]', goalName);
+    await page.fill('input[placeholder="3.000,00"]', "500");
+    await page.getByRole("button", { name: "Anlegen", exact: true }).click();
+    await expect(page.getByText(goalName)).toBeVisible();
+
+    const confirmDialog = page.getByRole("dialog", { name: "Sparziel löschen?" });
+    await page.getByRole("button", { name: `${goalName} löschen` }).click();
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole("button", { name: "Abbrechen" }).click();
+    await expect(confirmDialog).toBeHidden();
+    await expect(page.getByText(goalName)).toBeVisible();
+
+    await page.getByRole("button", { name: `${goalName} löschen` }).click();
+    await confirmDialog.getByRole("button", { name: "Löschen", exact: true }).click();
+    await expect(page.getByText(goalName)).toBeHidden({ timeout: 5000 });
+    expect(browserDialogs).toEqual([]);
+  });
 });

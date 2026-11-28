@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -24,6 +25,7 @@ export function PasskeyCard({
 }: {
   initialPasskeys: PasskeyItem[];
 }) {
+  const { confirm, confirmDialog } = useConfirm();
   const router = useRouter();
   const [passkeys, setPasskeys] = useState<PasskeyItem[]>(initialPasskeys);
   const [newName, setNewName] = useState("");
@@ -75,7 +77,7 @@ export function PasskeyCard({
   }
 
   async function handleDeletePasskey(id: string) {
-    if (!window.confirm("Möchtest du diesen Passkey wirklich entfernen?")) {
+    if (!(await confirm({ title: "Passkey entfernen?", confirmText: "Entfernen", variant: "danger", message: "Möchtest du diesen Passkey wirklich entfernen?" }))) {
       return;
     }
     const res = await authClient.passkey.deletePasskey({ id });
@@ -155,6 +157,7 @@ export function PasskeyCard({
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

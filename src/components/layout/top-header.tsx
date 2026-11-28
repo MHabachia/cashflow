@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useConfirm } from "@/components/ui/use-confirm";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CashflowLogo } from "@/components/ui/cashflow-logo";
@@ -60,6 +61,7 @@ export function TopHeader({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,9 +79,7 @@ export function TopHeader({
     const pending = await getOfflineQueue();
     if (
       pending.length > 0 &&
-      !confirm(
-        `${pending.length} offline erfasste Buchung(en) wurden noch nicht synchronisiert und gehen beim Abmelden verloren. Trotzdem abmelden?`
-      )
+      !(await confirm({ title: "Trotzdem abmelden?", confirmText: "Abmelden", variant: "warning", message: `${pending.length} offline erfasste Buchung(en) wurden noch nicht synchronisiert und gehen beim Abmelden verloren. Trotzdem abmelden?` }))
     ) {
       return;
     }
@@ -109,7 +109,10 @@ export function TopHeader({
     { href: "/categories", label: "Kategorien", icon: Tag },
   ];
 
+  // Rückfrage neben dem Header rendern: Innerhalb seiner Stapelebene (z-30)
+  // läge sie unter der unteren Navigation
   return (
+    <>
     <header className="sticky top-0 z-30 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 pt-safe">
       <div
         className={cn(
@@ -319,5 +322,7 @@ export function TopHeader({
         </div>
       </div>
     </header>
+    {confirmDialog}
+    </>
   );
 }
