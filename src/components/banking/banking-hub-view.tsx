@@ -242,7 +242,15 @@ export function BankingHubView({
         setDisconnectingId(bank.id);
         try {
           const res = await disconnectBankAction(bank.id);
-          if (res.success) {
+          if (res.success && res.revocationFailed) {
+            // Lokal getrennt, aber die Session beim Anbieter läuft weiter
+            const until = res.consentExpiresAt ? ` spätestens am ${formatDateDE(res.consentExpiresAt.slice(0, 10))}` : "";
+            toast.warning(
+              `Verbindung zu „${bank.institutionName}“ getrennt. Die Freigabe bei der Bank konnte nicht beendet werden; sie läuft${until} ab. Du kannst sie auch im Online-Banking widerrufen.`,
+              { duration: 15000 }
+            );
+            setBankingConfirm(null);
+          } else if (res.success) {
             toast.success(`Verbindung zu „${bank.institutionName}“ getrennt.`);
             setBankingConfirm(null);
           } else {

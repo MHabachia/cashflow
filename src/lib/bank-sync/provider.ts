@@ -62,6 +62,12 @@ export interface BankSyncProvider {
     balanceCents?: number | null;
     resolvedAccountExternalId?: string;
   }>;
+
+  /**
+   * Beendet die Session beim Anbieter, damit die Zustimmung nicht bis zu ihrem
+   * Ablauf weiterläuft. Eine bereits unbekannte Session gilt als beendet.
+   */
+  revokeSession(accessToken: string): Promise<void>;
 }
 
 /**
@@ -117,6 +123,9 @@ export function buildFallbackTransactionId(
  */
 class MockBankSyncProvider implements BankSyncProvider {
   name: BankProvider = "enable_banking";
+
+  // Sandbox ohne echte Session beim Anbieter: nichts zu beenden
+  async revokeSession(_accessToken: string): Promise<void> {}
 
   async createAuthSession(params: {
     institutionId: string;
@@ -630,6 +639,27 @@ export class EnableBankingLiveProvider implements BankSyncProvider {
       consentExpiresAt: expiresDate.toISOString().slice(0, 10),
       accounts,
     };
+  }
+
+  /**
+   * DELETE /sessions/{session_id}: Laut Enable Banking wird dabei auch die
+   * Zustimmung bei der Bank beendet, soweit die Bank das unterstützt.
+   */
+  async revokeSession(accessToken: string): Promise<void> {
+    const response = await fetchBank(
+      `https://api.enablebanking.com/sessions/${encodeURIComponent(accessToken)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${this.generateJwt()}` },
+      }
+    );
+    // 404: Session existiert nicht mehr (abgelaufen oder schon beendet)
+    if (response.ok || response.status === 404) return;
+    const errText = await response.text();
+    throw new BankApiError(
+      `Enable Banking Session konnte nicht beendet werden (${response.status}): ${errText}`,
+      response.status
+    );
   }
 
   async fetchTransactions(params: {

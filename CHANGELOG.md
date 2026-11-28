@@ -13,6 +13,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Die Duplikatsuche vergleicht nur noch Buchungen mit gleichem Betrag und Typ innerhalb des 3-Tage-Fensters statt jede mit jeder. Bei 50.000 Buchungen sinkt die Laufzeit von rund 8,8 s auf rund 0,1 s, das Ergebnis bleibt gleich.
 - Ungenutzten Code entfernt: die Komponenten `InviteManager` und `CsvManager`, das Tortendiagramm `CategoryDonutChart`, die Funktion `parsePdfStatement`, ungenutzte Berechnungen im Dashboard und den veralteten Ordner `drizzle/` (Stand 1.1.0; das Schema wird über `src/lib/db/migrations.ts` gepflegt).
 
+### Security
+- Beim Trennen einer Bank beendet die App die Session bei Enable Banking und damit, soweit die Bank das unterstützt, auch die Zustimmung zum Kontozugriff. Vorher lief sie bis zu 90 Tage weiter. Ist Enable Banking nicht erreichbar, wird trotzdem getrennt und auf das Ablaufdatum der Freigabe hingewiesen.
+
 ### Fixed
 - Umsatzliste: Eine gelöschte Buchung verschwindet sofort und kommt bei „Rückgängig“ sofort zurück. Vorher blieb die Zeile stehen, bis sich ein Filter änderte oder die Seite neu lud.
 - `npm run db:push` entfernt: Es hätte die Datenbank am Migrationsprotokoll vorbei an `schema.ts` angeglichen und dabei die Tabelle `schema_migrations` sowie zwei Indizes gelöscht. Schemaänderungen laufen nur über `src/lib/db/migrations.ts`. Das Schema deklariert jetzt alle Indizes, ein Test prüft Schema und Migrationen auf Übereinstimmung.
