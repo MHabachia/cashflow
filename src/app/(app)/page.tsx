@@ -41,8 +41,10 @@ import {
   computeBalanceBreakdown,
   computeLiquidityForecast,
   getNetWorthHistory,
-  occurrencesBetween,
+  recurringPaymentDates,
+  unpaidOccurrences,
 } from "@/lib/forecast";
+import { RECURRING_MATCH_WINDOW_DAYS, shiftIsoDate } from "@/lib/recurring-matching";
 import { getInboxCount } from "@/lib/inbox";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
@@ -261,13 +263,16 @@ export default async function DashboardPage({
   if (isCurrentMonth) {
     const todayKey = `${currentMonthPrefix}-${String(now.getDate()).padStart(2, "0")}`;
     const monthEndKey = `${currentMonthPrefix}-${String(totalDaysInMonth).padStart(2, "0")}`;
+    // Bereits gebuchte oder von der Bank (auch vor dem Fälligkeitstag)
+    // abgebuchte Fälligkeiten nicht zusätzlich als anstehend abziehen
+    const paymentDates = recurringPaymentDates(
+      user.id,
+      shiftIsoDate(todayKey, -RECURRING_MATCH_WINDOW_DAYS),
+      shiftIsoDate(monthEndKey, RECURRING_MATCH_WINDOW_DAYS)
+    );
     for (const f of userFixed) {
       if (!f.active) continue;
-      const dates = occurrencesBetween(f.nextDueDate, f.interval, f.dayOfMonth, todayKey, monthEndKey, f.endDate);
-      // Bereits heute gebuchte Fälligkeiten nicht doppelt abziehen
-      const pending = dates.filter(
-        (d) => !currentMonthTx.some((t) => t.recurringId === f.id && t.date === d)
-      );
+      const pending = unpaidOccurrences(f, todayKey, monthEndKey, paymentDates);
       if (f.type === "income") upcomingFixedIncomeCents += pending.length * f.amountCents;
       else upcomingFixedExpenseCents += pending.length * f.amountCents;
     }

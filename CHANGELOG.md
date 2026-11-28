@@ -36,6 +36,12 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 ### Fixed
 - „1.500“ wird als 1.500 € gelesen statt als 1,50 € (Tausenderpunkt ohne Komma). Auch „1,234.56“ (englisches Format) wird erkannt.
 - CSV-Import ohne Typ-Spalte: Nutzt die Datei Vorzeichen, sind Beträge ohne Minus Einnahmen. Vorher wurde z. B. ein Gehalt „+2.500,00“ als Ausgabe gebucht und der Kontostand falsch verändert.
+- Fixkosten am 29., 30. oder 31. überspringen keine kurzen Monate mehr (31.01. → 28.02. → 31.03. statt 31.01. → 31.03.). Betroffen waren automatisches Buchen, Prognose und Fixkosten-Kalender.
+- „Jetzt buchen“ verknüpft die Buchung mit den Fixkosten und schiebt die nächste Fälligkeit weiter; vorher buchte das automatische Buchen am Fälligkeitstag ein zweites Mal. Ein zweiter Klick am selben Tag wird abgelehnt.
+- Fixkosten aus einer bestehenden Buchung starten mit dem nächsten Termin nach dieser Buchung statt heute (vorher doppelte Buchung bei automatischem Buchen).
+- Tagesbudget und Prognose zählen Fixkosten, die die Bank schon vor dem Fälligkeitstag abgebucht hat, nicht mehr zusätzlich als anstehend.
+- Wöchentliche Fixkosten: Die Zahlung der Vorwoche gilt nicht mehr als Zahlung der aktuellen Woche (Abgleichfenster ±3 statt ±10 Tage).
+- Manuell geführte Fixkosten mit altem Fälligkeitsdatum verschwinden nicht mehr nach 60 Terminen aus Prognose und Kalender; der Kalender beachtet das Enddatum.
 
 ## [1.2.1] – 2026-11-26
 

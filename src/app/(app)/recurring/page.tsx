@@ -43,6 +43,7 @@ export default async function RecurringPage() {
       dayOfMonth: i.dayOfMonth,
       nextDueDate: i.nextDueDate,
       active: i.active,
+      endDate: i.endDate,
     })),
     today.slice(0, 7),
     forecast.hasAccounts ? forecast.startBalanceCents : null,

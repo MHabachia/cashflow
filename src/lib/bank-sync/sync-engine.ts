@@ -15,7 +15,7 @@ import { detectOwnAccountTransfers } from "@/lib/transfer-detection";
 import { and, eq, sql, desc, gte, lte } from "drizzle-orm";
 import {
   findMatchingRecurring,
-  RECURRING_MATCH_WINDOW_DAYS,
+  matchWindowDays,
   shiftIsoDate,
 } from "@/lib/recurring-matching";
 import { logAudit } from "@/lib/audit";
@@ -298,6 +298,7 @@ export async function syncBankAccountTransactions(
         amountCents: recurringExpenses.amountCents,
         categoryId: recurringExpenses.categoryId,
         type: recurringExpenses.type,
+        interval: recurringExpenses.interval,
       })
       .from(recurringExpenses)
       .where(
@@ -440,8 +441,8 @@ export async function syncBankAccountTransactions(
               and(
                 eq(transactions.userId, userId),
                 eq(transactions.recurringId, matchingRecurring.id),
-                gte(transactions.date, shiftIsoDate(rawTx.bookingDate, -RECURRING_MATCH_WINDOW_DAYS)),
-                lte(transactions.date, shiftIsoDate(rawTx.bookingDate, RECURRING_MATCH_WINDOW_DAYS)),
+                gte(transactions.date, shiftIsoDate(rawTx.bookingDate, -matchWindowDays(matchingRecurring.interval))),
+                lte(transactions.date, shiftIsoDate(rawTx.bookingDate, matchWindowDays(matchingRecurring.interval))),
                 sql`${transactions.bankTransactionId} IS NULL`
               )
             )

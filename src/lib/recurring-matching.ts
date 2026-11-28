@@ -1,4 +1,5 @@
 import { normalizeMerchant } from "@/lib/subscription-detection";
+import type { RecurringInterval } from "@/lib/db/schema";
 
 /**
  * Zuordnung echter Bankumsätze zu Fixkosten-Vorlagen.
@@ -12,6 +13,15 @@ import { normalizeMerchant } from "@/lib/subscription-detection";
  */
 
 export const RECURRING_MATCH_WINDOW_DAYS = 10;
+
+/**
+ * Abgleichfenster in Tagen um einen Fälligkeitstag. Höchstens die halbe
+ * Intervalllänge, sonst fiele bei wöchentlichen Posten die Buchung der
+ * Vorwoche ins Fenster und die aktuelle Fälligkeit gälte als bezahlt.
+ */
+export function matchWindowDays(interval: RecurringInterval): number {
+  return interval === "weekly" ? 3 : RECURRING_MATCH_WINDOW_DAYS;
+}
 
 export interface RecurringCandidate {
   id: string;

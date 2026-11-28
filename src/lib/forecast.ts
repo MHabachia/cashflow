@@ -8,7 +8,8 @@ import {
   type RecurringInterval,
 } from "@/lib/db/schema";
 import { addIntervalToDate } from "@/lib/recurring-processor";
-import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, lt, lte, sql } from "drizzle-orm";
+import { matchWindowDays, RECURRING_MATCH_WINDOW_DAYS, shiftIsoDate } from "@/lib/recurring-matching";
 
 /**
  * Liquiditätsprognose bis Monatsende und Nettovermögen über die Zeit.
@@ -49,6 +50,11 @@ function shiftDays(iso: string, days: number): string {
   return isoDate(new Date(y, m - 1, d + days));
 }
 
+/** Obergrenze beim Vorspulen alter Fälligkeiten (≈ 38 Jahre wöchentlich). */
+const MAX_SKIPPED_OCCURRENCES = 2000;
+/** Höchstzahl gelieferter Fälligkeiten in einem Zeitraum. */
+const MAX_RETURNED_OCCURRENCES = 60;
+
 /** Alle Fälligkeiten eines Postens zwischen `from` und `to` (inklusive). */
 export function occurrencesBetween(
   nextDueDate: string,
@@ -58,14 +64,71 @@ export function occurrencesBetween(
   to: string,
   endDate?: string | null
 ): string[] {
-  const dates: string[] = [];
+  // Fälligkeiten vor `from` überspringen, ohne sie mitzuzählen: Manuelle Posten
+  // (ohne automatisches Buchen) behalten ein altes nextDueDate und fielen sonst
+  // nach 60 Terminen aus Prognose und Kalender
   let due = nextDueDate;
-  for (let i = 0; i < 60 && due <= to; i++) {
+  for (let i = 0; i < MAX_SKIPPED_OCCURRENCES && due < from; i++) {
+    due = addIntervalToDate(due, interval, dayOfMonth);
+  }
+  const dates: string[] = [];
+  for (let i = 0; i < MAX_RETURNED_OCCURRENCES && due <= to; i++) {
     if (endDate && due > endDate) break;
     if (due >= from) dates.push(due);
     due = addIntervalToDate(due, interval, dayOfMonth);
   }
   return dates;
+}
+
+/**
+ * Daten aller Buchungen, die den Fixkosten des Benutzers zugeordnet sind
+ * (automatisch gebucht oder von der Bank abgeglichen), je Fixkosten-ID.
+ */
+export function recurringPaymentDates(userId: string, from: string, to: string): Map<string, string[]> {
+  const rows = db
+    .select({ recurringId: transactions.recurringId, date: transactions.date })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        isNotNull(transactions.recurringId),
+        gte(transactions.date, from),
+        lte(transactions.date, to)
+      )
+    )
+    .all();
+  const byRecurring = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!row.recurringId) continue;
+    const list = byRecurring.get(row.recurringId) ?? [];
+    list.push(row.date);
+    byRecurring.set(row.recurringId, list);
+  }
+  return byRecurring;
+}
+
+/**
+ * Fälligkeiten, für die noch keine zugeordnete Buchung im Abgleichfenster
+ * existiert. Bucht die Bank z. B. die Miete zwei Tage vor Fälligkeit ab,
+ * zählt sie nicht zusätzlich als „anstehend“.
+ */
+export function unpaidOccurrences(
+  item: {
+    id: string;
+    nextDueDate: string;
+    interval: RecurringInterval;
+    dayOfMonth: number;
+    endDate?: string | null;
+  },
+  from: string,
+  to: string,
+  paymentDates: Map<string, string[]>
+): string[] {
+  const paid = paymentDates.get(item.id) ?? [];
+  const window = matchWindowDays(item.interval);
+  return occurrencesBetween(item.nextDueDate, item.interval, item.dayOfMonth, from, to, item.endDate).filter(
+    (due) => !paid.some((date) => date >= shiftIsoDate(due, -window) && date <= shiftIsoDate(due, window))
+  );
 }
 
 export function computeLiquidityForecast(userId: string, now: Date = new Date()): LiquidityForecast {
@@ -87,9 +150,15 @@ export function computeLiquidityForecast(userId: string, now: Date = new Date())
     .where(and(eq(recurringExpenses.userId, userId), eq(recurringExpenses.active, true)))
     .all();
 
+  // Größtes Abgleichfenster, damit auch Zahlungen kurz vor `today` zählen
+  const paymentDates = recurringPaymentDates(
+    userId,
+    shiftDays(today, -RECURRING_MATCH_WINDOW_DAYS),
+    shiftDays(monthEnd, RECURRING_MATCH_WINDOW_DAYS)
+  );
   const upcoming: UpcomingItem[] = [];
   for (const r of recurring) {
-    for (const date of occurrencesBetween(r.nextDueDate, r.interval, r.dayOfMonth, today, monthEnd, r.endDate)) {
+    for (const date of unpaidOccurrences(r, today, monthEnd, paymentDates)) {
       upcoming.push({ name: r.name, date, amountCents: r.amountCents, type: r.type });
     }
   }

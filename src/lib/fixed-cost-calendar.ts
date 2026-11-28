@@ -9,6 +9,8 @@ export interface CalendarSource {
   dayOfMonth: number;
   nextDueDate: string;
   active: boolean;
+  /** Letzter Termin; danach erscheint der Posten nicht mehr im Kalender */
+  endDate?: string | null;
 }
 
 export interface CalendarEntry {
@@ -51,7 +53,7 @@ export function buildMonthCalendar(
   const raw: Omit<CalendarEntry, "balanceAfterCents">[] = [];
   for (const s of sources) {
     if (!s.active) continue;
-    for (const date of occurrencesBetween(s.nextDueDate, s.interval, s.dayOfMonth, from, to)) {
+    for (const date of occurrencesBetween(s.nextDueDate, s.interval, s.dayOfMonth, from, to, s.endDate)) {
       raw.push({ date, name: s.name, type: s.type, amountCents: s.amountCents });
     }
   }
