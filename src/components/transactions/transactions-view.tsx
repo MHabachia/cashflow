@@ -14,6 +14,7 @@ import {
   applyCategoryRulesAction,
 } from "@/actions/category-rule-actions";
 import { saveRecentTransactionsSnapshot } from "@/lib/offline-queue";
+import { BANK_TRANSACTION_DELETE_ERROR } from "@/lib/transaction-messages";
 import {
   formatCents,
   formatDateDE,
@@ -73,6 +74,8 @@ interface TransactionRow {
   isSplit?: boolean;
   bankAccountId?: string | null;
   bankAccountName?: string | null;
+  /** Von der Bank übernommen: nicht löschbar (siehe deleteTransactionAction) */
+  isBankSynced?: boolean;
 }
 
 function formatDateGroupHeader(dateStr: string): string {
@@ -471,6 +474,10 @@ export function TransactionsView({
 
   function handleDelete(id: string) {
     setSwipedId(null);
+    if (transactions.find((t) => t.id === id)?.isBankSynced) {
+      toast.error(BANK_TRANSACTION_DELETE_ERROR);
+      return;
+    }
     setPendingDeleteIds((prev) => new Set(prev).add(id));
     let settled = false;
     const restore = () =>
@@ -485,7 +492,7 @@ export function TransactionsView({
       const res = await deleteTransactionAction(id);
       if (!res.success) {
         restore();
-        toast.error("Löschen fehlgeschlagen.");
+        toast.error(res.error || "Löschen fehlgeschlagen.");
       }
     };
     toast("Buchung gelöscht", {
@@ -1348,12 +1355,17 @@ export function TransactionsView({
                 setSwipedId(null);
                 setDeleteConfirm(null);
               } else {
-                toast.error("Löschen fehlgeschlagen.");
+                toast.error(res.error || "Löschen fehlgeschlagen.");
               }
             } else if (deleteConfirm.type === "batch") {
               const res = await batchDeleteTransactionsAction(Array.from(selectedTxIds));
               if (res.success) {
                 toast.success(`${res.count} Buchungen erfolgreich gelöscht.`);
+                if (res.skippedBankCount) {
+                  toast.info(
+                    `${res.skippedBankCount} von der Bank übernommene Buchungen wurden nicht gelöscht.`
+                  );
+                }
                 setSelectedTxIds(new Set());
                 setDeleteConfirm(null);
               } else {

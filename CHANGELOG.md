@@ -44,6 +44,9 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Manuell geführte Fixkosten mit altem Fälligkeitsdatum verschwinden nicht mehr nach 60 Terminen aus Prognose und Kalender; der Kalender beachtet das Enddatum.
 - Datumsangaben richten sich nach der lokalen Zeitzone statt nach UTC. Vorher bekamen z. B. Umbuchungen und Saldo-Abgleiche kurz nach Mitternacht das Datum des Vortags, „Heute/Gestern“ in der Umsatzliste stimmte bis 1 bzw. 2 Uhr nicht, und der Budget-Hinweis am Monatsersten prüfte noch den Vormonat.
 - Das Docker-Image setzt `TZ=Europe/Berlin`; über `.env` änderbar.
+- Von der Bank übernommene Buchungen lassen sich nicht mehr löschen. Vorher änderte das Löschen den Kontostand, und der nächste Abruf importierte die Buchung erneut. Massenlöschen überspringt sie und meldet die Anzahl.
+- Der Betrag einer aufgeteilten Buchung lässt sich nicht mehr ändern, ohne die Aufteilung aufzuheben; vorher passten die Teilbeträge nicht mehr zur Summe.
+- Bank-Sync: Ohne passende Kategorie scheitert der Abruf nicht mehr an einer erfundenen Kategorie-ID. Kurze Suchwörter für die Kategorie-Vorschläge treffen nur ganze Wörter („Gastro“ landet nicht mehr unter Wohnen).
 
 ## [1.2.1] – 2026-11-26
 
