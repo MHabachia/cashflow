@@ -23,6 +23,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { setThemeMode } from "@/lib/theme";
 
 interface CommandItem {
   id: string;
@@ -233,13 +234,7 @@ export function CommandBar({
         action: () => {
           setOpen(false);
           const isDark = document.documentElement.classList.contains("dark");
-          if (isDark) {
-            document.documentElement.classList.remove("dark");
-            localStorage.setItem("theme", "light");
-          } else {
-            document.documentElement.classList.add("dark");
-            localStorage.setItem("theme", "dark");
-          }
+          setThemeMode(isDark ? "light" : "dark");
         },
       },
     ];

@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
+import {
+  THEME_CHANGE_EVENT,
+  THEME_STORAGE_KEY,
+  applyThemeClass,
+  parseThemeMode,
+  setThemeMode,
+  type ThemeMode,
+} from "@/lib/theme";
 
-export type ThemeMode = "light" | "dark";
-
-function applyThemeClass(mode: ThemeMode) {
-  if (typeof window === "undefined") return;
-  const root = document.documentElement;
-  if (mode === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
-}
+export type { ThemeMode };
 
 export function ThemeToggleButton() {
   const [theme, setTheme] = useState<ThemeMode>("light");
@@ -21,26 +19,24 @@ export function ThemeToggleButton() {
 
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem("cashflow_theme");
-    let initial: ThemeMode;
-    if (saved === "dark" || saved === "light") {
-      initial = saved;
-    } else {
-      // Wenn noch nichts gespeichert ist, Systempräferenz einmalig ermitteln
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      initial = prefersDark ? "dark" : "light";
-    }
+    // Wenn noch nichts gespeichert ist, Systempräferenz einmalig ermitteln
+    const initial =
+      parseThemeMode(localStorage.getItem(THEME_STORAGE_KEY)) ??
+      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     setTheme(initial);
     applyThemeClass(initial);
+
+    // Umschalten an anderer Stelle (z. B. Befehlsleiste) im Symbol nachziehen
+    const handleChange = (event: Event) => {
+      const mode = parseThemeMode((event as CustomEvent<string>).detail);
+      if (mode) setTheme(mode);
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, handleChange);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, handleChange);
   }, []);
 
   function toggleTheme() {
-    const next: ThemeMode = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    try {
-      localStorage.setItem("cashflow_theme", next);
-    } catch {}
-    applyThemeClass(next);
+    setThemeMode(theme === "dark" ? "light" : "dark");
   }
 
   // Bevor gemountet ist, neutralen Platzhalter rendern um Hydration Mismatch zu verhindern

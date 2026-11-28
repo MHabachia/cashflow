@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { getGlobalAppSettings } from "@/lib/settings";
 import { headers } from "next/headers";
+import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +80,7 @@ export default async function RootLayout({
             __html: `
               (function() {
                 try {
-                  var mode = localStorage.getItem('cashflow_theme');
+                  var mode = localStorage.getItem('${THEME_STORAGE_KEY}');
                   var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                   var isDark = mode === 'dark' || (!mode && prefersDark);
                   if (isDark) {
