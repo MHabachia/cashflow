@@ -33,6 +33,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 - Der Download einer Sicherung legt die Kopie in einem nur für den Prozess lesbaren Verzeichnis an, entfernt sie in jedem Fall und wird nicht zwischengespeichert (`Cache-Control: no-store`).
 - Das öffentliche App-Icon wird zwischengespeichert statt bei jedem Abruf neu gerendert.
 
+### Fixed
+- „1.500“ wird als 1.500 € gelesen statt als 1,50 € (Tausenderpunkt ohne Komma). Auch „1,234.56“ (englisches Format) wird erkannt.
+- CSV-Import ohne Typ-Spalte: Nutzt die Datei Vorzeichen, sind Beträge ohne Minus Einnahmen. Vorher wurde z. B. ein Gehalt „+2.500,00“ als Ausgabe gebucht und der Kontostand falsch verändert.
+
 ## [1.2.1] – 2026-11-26
 
 Bank nach einem Schlüsselwechsel wieder verbinden.
