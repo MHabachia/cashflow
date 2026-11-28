@@ -6,6 +6,10 @@ Die Versionen 0.0.1 bis 1.0.0 fassen die Entwicklung bis zum ersten veröffentli
 
 ## [Unreleased]
 
+## [1.3.1] – 2026-11-28
+
+Fehlerbehebungen für Offline-Erfassung und Umsatzliste, Widerruf der Bank-Zustimmung beim Trennen und schnellere Abfragen. Keine neue Datenbank-Migration.
+
 ### Changed
 - CI: Fehlerprotokolle der E2E-Tests (`test-results/`) werden 7 Tage als Artefakt aufbewahrt, auch wenn ein Test erst bei der Wiederholung bestanden hat.
 - Die Umsatzliste lädt nur noch die Buchungen des gewählten Monats statt der ganzen Historie; der Monat steht in der Adresse (`?month=2026-11`, `?month=all` für alle Monate). Die Offline-Ansicht speichert weiterhin die neuesten Buchungen.
@@ -221,7 +225,8 @@ Einfachere Bedienung, neue Auswertungen, Werkzeuge für Admins.
 - Next.js, TypeScript, SQLite mit Drizzle, Anmeldung mit Better Auth.
 - Kategorien und manuell erfasste Buchungen.
 
-[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/MHabachia/cashflow/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/MHabachia/cashflow/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/MHabachia/cashflow/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/MHabachia/cashflow/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/MHabachia/cashflow/compare/v1.1.0...v1.2.0
