@@ -91,6 +91,8 @@ export default async function BankingPage() {
         creditLimitCents: a.creditLimitCents,
         billingDayOfMonth: a.billingDayOfMonth,
         notes: a.notes,
+        settlementAccountId: a.settlementAccountId,
+        settlementMatchPattern: a.settlementMatchPattern,
         autoSync: a.autoSync,
         lastSyncError: a.lastSyncError,
         syncBackoffUntil: a.syncBackoffUntil
@@ -124,6 +126,8 @@ export default async function BankingPage() {
         creditLimitCents: a.creditLimitCents,
         billingDayOfMonth: a.billingDayOfMonth,
         notes: a.notes,
+        settlementAccountId: a.settlementAccountId,
+        settlementMatchPattern: a.settlementMatchPattern,
         autoSync: false,
         lastSyncError: null,
         syncBackoffUntil: null,

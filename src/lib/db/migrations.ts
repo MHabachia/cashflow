@@ -689,6 +689,28 @@ export const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 10,
+    name: "card_settlement_link",
+    up: (sqlite) => {
+      // Verknüpfung einer manuellen Kreditkarte mit dem Girokonto, von dem ihr
+      // Ausgleich abgebucht wird. Nur neue, leere Spalten: bestehende Konten
+      // ändern sich nicht.
+      const cols = sqlite.prepare("PRAGMA table_info(bank_accounts)").all() as { name: string }[];
+      const has = (name: string) => cols.some((c) => c.name === name);
+      if (!has("settlement_account_id")) {
+        sqlite.exec(
+          "ALTER TABLE bank_accounts ADD COLUMN settlement_account_id TEXT REFERENCES bank_accounts(id) ON DELETE SET NULL;"
+        );
+      }
+      if (!has("settlement_match_pattern")) {
+        sqlite.exec("ALTER TABLE bank_accounts ADD COLUMN settlement_match_pattern TEXT;");
+      }
+      if (!has("settlement_since")) {
+        sqlite.exec("ALTER TABLE bank_accounts ADD COLUMN settlement_since TEXT;");
+      }
+    },
+  },
 ];
 
 /**

@@ -12,6 +12,7 @@ import { decryptBankToken, encryptBankToken, needsReencryption } from "../crypto
 import { BankApiError, getBankSyncProvider } from "./provider";
 import { findMatchingRule } from "@/lib/category-rules";
 import { detectOwnAccountTransfers } from "@/lib/transfer-detection";
+import { applyCardSettlements } from "@/lib/card-settlement";
 import { and, eq, sql, desc, gte, lte } from "drizzle-orm";
 import {
   findMatchingRecurring,
@@ -551,6 +552,16 @@ export async function syncBankAccountTransactions(
         .where(eq(connectedBanks.id, bank.id))
         .run();
     });
+
+    // Kartenausgleich für verknüpfte manuelle Kreditkarten (vor der
+    // Umbuchungs-Erkennung, damit die Abbuchung nicht doppelt gepaart wird)
+    if (importedCount > 0) {
+      try {
+        applyCardSettlements(userId);
+      } catch (settleErr) {
+        console.warn("Kartenausgleich fehlgeschlagen:", settleErr);
+      }
+    }
 
     // Umbuchungen zwischen eigenen Konten (z. B. Giro → Tagesgeld) erkennen
     if (importedCount > 0) {

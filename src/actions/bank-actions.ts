@@ -24,6 +24,11 @@ import {
   syncAllActiveBankAccounts,
 } from "@/lib/bank-sync/sync-engine";
 import { getOrCreateTransferCategory } from "@/lib/transfer-detection";
+import { applyCardSettlements, findSettlementDebits } from "@/lib/card-settlement";
+import {
+  MIN_SETTLEMENT_PATTERN_LENGTH,
+  normalizeSettlementPattern,
+} from "@/lib/card-settlement-pattern";
 import {
   firstIssueMessage,
   idSchema,
@@ -37,7 +42,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import crypto from "node:crypto";
-import { todayISO } from "@/lib/format";
+import { shiftedLocalISODate, todayISO } from "@/lib/format";
 
 const BILLING_DAY_ERROR = "Der Abrechnungstag muss zwischen 1 und 31 liegen.";
 const billingDaySchema = z.number({ error: BILLING_DAY_ERROR }).int(BILLING_DAY_ERROR).min(1, BILLING_DAY_ERROR).max(31, BILLING_DAY_ERROR);
@@ -50,12 +55,67 @@ const createManualAccountSchema = z.object({
   billingDayOfMonth: billingDaySchema.nullable().optional(),
   ibanMasked: optionalText(50),
   notes: optionalText(500),
+  /** Nur Kreditkarten: Girokonto, von dem der Kartenausgleich abgebucht wird */
+  settlementAccountId: idSchema.nullable().optional(),
+  settlementMatchPattern: z.string().trim().max(60).nullable().optional(),
 });
 
 const updateBankAccountSchema = createManualAccountSchema
   .omit({ accountType: true })
   .partial()
   .extend({ accountId: idSchema, accountName: z.string().trim().max(100).optional() });
+
+type SettlementLink =
+  | { ok: true; settlementAccountId: string | null; settlementMatchPattern: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Prüft die Verknüpfung einer Karte mit ihrem Ausgleichskonto: nur manuelle
+ * Kreditkarten, Ausgleichskonto gehört dem Benutzer und ist keine Kreditkarte,
+ * Erkennungsbegriff mit Mindestlänge (zu allgemeine Begriffe träfen fremde
+ * Abbuchungen).
+ */
+function resolveSettlementLink(
+  userId: string,
+  card: { id?: string; accountType: BankAccountType; connectedBankId: string | null },
+  settlementAccountId: string | null | undefined,
+  pattern: string | null | undefined
+): SettlementLink {
+  if (!settlementAccountId) {
+    return { ok: true, settlementAccountId: null, settlementMatchPattern: null };
+  }
+  if (card.accountType !== "credit_card") {
+    return { ok: false, error: "Ein Ausgleichskonto lässt sich nur für Kreditkarten festlegen." };
+  }
+  if (card.connectedBankId) {
+    return { ok: false, error: "Per Bank angebundene Karten erhalten den Ausgleich direkt von der Bank." };
+  }
+  const normalized = normalizeSettlementPattern(pattern);
+  if (normalized.length < MIN_SETTLEMENT_PATTERN_LENGTH) {
+    return {
+      ok: false,
+      error: `Der Erkennungsbegriff braucht mindestens ${MIN_SETTLEMENT_PATTERN_LENGTH} Zeichen.`,
+    };
+  }
+  const settlementAccount = db
+    .select({ id: bankAccounts.id, accountType: bankAccounts.accountType })
+    .from(bankAccounts)
+    .where(and(eq(bankAccounts.id, settlementAccountId), eq(bankAccounts.userId, userId)))
+    .get();
+  if (!settlementAccount || settlementAccount.id === card.id || settlementAccount.accountType === "credit_card") {
+    return { ok: false, error: "Bitte ein eigenes Konto wählen, das keine Kreditkarte ist." };
+  }
+  return { ok: true, settlementAccountId, settlementMatchPattern: normalized };
+}
+
+/** Wendet den Kartenausgleich direkt nach dem Speichern an; Fehler blockieren das Speichern nicht. */
+function applySettlementsAfterSave(userId: string, cardId: string) {
+  try {
+    applyCardSettlements(userId, cardId);
+  } catch (err) {
+    console.warn("Kartenausgleich nach dem Speichern fehlgeschlagen:", err);
+  }
+}
 
 const accountTransferSchema = z.object({
   sourceAccountId: idSchema,
@@ -411,6 +471,8 @@ export interface CreateManualAccountInput {
   billingDayOfMonth?: number | null;
   ibanMasked?: string | null;
   notes?: string | null;
+  settlementAccountId?: string | null;
+  settlementMatchPattern?: string | null;
 }
 
 /**
@@ -432,6 +494,14 @@ export async function createManualBankAccountAction(
     const now = new Date();
     const accountId = crypto.randomUUID();
 
+    const link = resolveSettlementLink(
+      user.id,
+      { id: accountId, accountType: input.accountType, connectedBankId: null },
+      input.settlementAccountId,
+      input.settlementMatchPattern
+    );
+    if (!link.ok) return { success: false, error: link.error };
+
     db.insert(bankAccounts)
       .values({
         id: accountId,
@@ -447,11 +517,17 @@ export async function createManualBankAccountAction(
           input.creditLimitCents !== undefined ? input.creditLimitCents : null,
         billingDayOfMonth: input.billingDayOfMonth || null,
         notes: input.notes?.trim() || null,
+        settlementAccountId: link.settlementAccountId,
+        settlementMatchPattern: link.settlementMatchPattern,
+        // Nur Abbuchungen ab heute: ältere Ausgleiche sind schon erfasst
+        settlementSince: link.settlementAccountId ? todayISO() : null,
         autoSync: false,
         createdAt: now,
         updatedAt: now,
       })
       .run();
+
+    if (link.settlementAccountId) applySettlementsAfterSave(user.id, accountId);
 
     safeRevalidatePath("/banking");
     safeRevalidatePath("/settings");
@@ -475,6 +551,8 @@ export interface UpdateBankAccountInput {
   balanceCents?: number | null;
   ibanMasked?: string | null;
   notes?: string | null;
+  settlementAccountId?: string | null;
+  settlementMatchPattern?: string | null;
 }
 
 /**
@@ -523,10 +601,27 @@ export async function updateBankAccountAction(rawInput: UpdateBankAccountInput) 
       updatePayload.notes = input.notes ? input.notes.trim() : null;
     }
 
+    let linkChanged = false;
+    if (input.settlementAccountId !== undefined) {
+      const link = resolveSettlementLink(user.id, account, input.settlementAccountId, input.settlementMatchPattern);
+      if (!link.ok) return { success: false, error: link.error };
+      updatePayload.settlementAccountId = link.settlementAccountId;
+      updatePayload.settlementMatchPattern = link.settlementMatchPattern;
+      if (!link.settlementAccountId) {
+        updatePayload.settlementSince = null;
+      } else if (link.settlementAccountId !== account.settlementAccountId || !account.settlementSince) {
+        // Neue Verknüpfung: erst ab heute abgleichen
+        updatePayload.settlementSince = todayISO();
+      }
+      linkChanged = link.settlementAccountId !== null;
+    }
+
     db.update(bankAccounts)
       .set(updatePayload)
       .where(eq(bankAccounts.id, account.id))
       .run();
+
+    if (linkChanged) applySettlementsAfterSave(user.id, account.id);
 
     safeRevalidatePath("/banking");
     safeRevalidatePath("/settings");
@@ -853,6 +948,49 @@ export async function reconcileAccountBalanceAction(rawInput: ReconcileBalanceIn
     return {
       success: false,
       error: publicErrorMessage(err, "Saldenabgleich fehlgeschlagen.", "bank-actions"),
+    };
+  }
+}
+
+const settlementPreviewSchema = z.object({
+  settlementAccountId: idSchema,
+  pattern: z.string().max(60),
+});
+
+/** Tage, die die Vorschau des Erkennungsbegriffs zurückblickt */
+const SETTLEMENT_PREVIEW_DAYS = 90;
+
+/**
+ * Vorschau für den Konto-Dialog: Wie viele Abbuchungen der letzten 90 Tage
+ * auf dem Ausgleichskonto träfe der Erkennungsbegriff? So fällt ein zu
+ * allgemeiner Begriff auf, bevor er Buchungen umwandelt.
+ */
+export async function previewCardSettlementAction(rawInput: { settlementAccountId: string; pattern: string }) {
+  try {
+    const user = await requireUser();
+    const parsed = settlementPreviewSchema.safeParse(rawInput);
+    if (!parsed.success) return { success: false as const, error: firstIssueMessage(parsed.error) };
+    const { settlementAccountId, pattern } = parsed.data;
+    if (normalizeSettlementPattern(pattern).length < MIN_SETTLEMENT_PATTERN_LENGTH) {
+      return { success: true as const, matchCount: 0, examples: [] as string[] };
+    }
+    const owned = db
+      .select({ id: bankAccounts.id })
+      .from(bankAccounts)
+      .where(and(eq(bankAccounts.id, settlementAccountId), eq(bankAccounts.userId, user.id)))
+      .get();
+    if (!owned) return { success: false as const, error: "Konto nicht gefunden." };
+
+    const debits = findSettlementDebits(user.id, settlementAccountId, pattern, shiftedLocalISODate(-SETTLEMENT_PREVIEW_DAYS));
+    return {
+      success: true as const,
+      matchCount: debits.length,
+      examples: debits.slice(0, 3).map((d) => d.description),
+    };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: publicErrorMessage(err, "Vorschau nicht möglich.", "bank-actions"),
     };
   }
 }

@@ -5,6 +5,7 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
 // ==========================================
@@ -356,6 +357,15 @@ export const bankAccounts = sqliteTable(
     syncFailureCount: integer("sync_failure_count").notNull().default(0),
     syncBackoffUntil: integer("sync_backoff_until", { mode: "timestamp_ms" }),
     lastSyncError: text("last_sync_error"),
+    // Kartenausgleich: manuelle Kreditkarte, deren Ausgleich vom Girokonto
+    // `settlementAccountId` abgebucht wird (Erkennung über den Begriff im
+    // Buchungstext, erst ab `settlementSince`, siehe src/lib/card-settlement.ts)
+    settlementAccountId: text("settlement_account_id").references(
+      (): AnySQLiteColumn => bankAccounts.id,
+      { onDelete: "set null" }
+    ),
+    settlementMatchPattern: text("settlement_match_pattern"),
+    settlementSince: text("settlement_since"), // YYYY-MM-DD
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   },

@@ -14,6 +14,7 @@ import { publicErrorMessage } from "@/lib/errors";
 import { parseEuroToCents, todayISO } from "@/lib/format";
 import { findMatchingRule } from "@/lib/category-rules";
 import { detectOwnAccountTransfers } from "@/lib/transfer-detection";
+import { applyCardSettlements, isCoveredByCardSettlement } from "@/lib/card-settlement";
 import { getOrCreateImportBankAccount } from "@/lib/import-bank-account";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -268,6 +269,17 @@ export async function importCsvTransactionsAction(
       const date =
         idxDate >= 0 ? normalizeDate(cols[idxDate] || "") : todayISO();
 
+      // Kartenauszug: Die Zahlung vom Girokonto steht dort noch einmal als
+      // Eingang. Wurde sie schon automatisch ausgeglichen, nicht doppelt buchen
+      if (
+        type === "income" &&
+        targetBankAccountId &&
+        isCoveredByCardSettlement(user.id, targetBankAccountId, amountCents, date)
+      ) {
+        skippedDuplicates++;
+        continue;
+      }
+
       const rawCostType = (
         idxCostType >= 0 ? cols[idxCostType] : ""
       ).toLowerCase();
@@ -410,6 +422,15 @@ export async function importCsvTransactionsAction(
       }
     }
   });
+
+  // Kartenausgleich, falls das Zielkonto das Ausgleichskonto einer Karte ist
+  if (importedCount > 0 && targetBankAccountId) {
+    try {
+      applyCardSettlements(user.id);
+    } catch (err) {
+      console.warn("Kartenausgleich nach Import fehlgeschlagen:", err);
+    }
+  }
 
   // Umbuchungen zwischen eigenen Konten erkennen (z. B. Giro-Export + Tagesgeld-Export)
   if (importedCount > 0 && targetBankAccountId) {

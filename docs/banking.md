@@ -22,6 +22,20 @@ Cashflow kann Bankbuchungen und Kreditkartenumsätze über PSD2 (Enable Banking)
 4. Nach erfolgreicher Freigabe leitet die Bank zurück auf Cashflow (`/api/bank-sync/callback`). Die Konten und Karten werden angelegt.
 5. Über **„Alle synchronisieren“** oder den Sync-Button am jeweiligen Konto werden neue Umsätze abgerufen, idempotent dedupliziert und automatisch bestehenden Fixkosten-Verträgen (Miete, Strom, Abos) bzw. Kategorien zugeordnet.
 
+## Kartenausgleich für manuelle Kreditkarten
+
+Kreditkarten ohne PSD2-Zugang (z. B. Advanzia, TF Bank) führst du als manuelles Konto. Wird ihr Ausgleich von einem deiner Konten abgebucht, kann die App den Kartensaldo automatisch anpassen:
+
+1. Karte unter **Banking** bearbeiten und unter **Ausgleich vom Girokonto** das Konto wählen, von dem abgebucht wird.
+2. **Erkennungsbegriff** prüfen (mindestens 4 Zeichen, Vorschlag aus dem Kartennamen, z. B. `advanzia`). Die Vorschau zeigt, wie viele Abbuchungen der letzten 90 Tage er trifft.
+3. Speichern.
+
+Ab dann gilt: Kommt auf dem Girokonto eine Abbuchung mit dem Begriff an (Bank-Sync oder Import), wird sie als Umbuchung markiert und zählt nicht als Ausgabe. Auf der Karte entsteht die passende Gutschrift, der Kartensaldo steigt um den Betrag. Jede Abbuchung wird nur einmal verarbeitet.
+
+- Abgeglichen werden nur Abbuchungen ab dem Tag der Verknüpfung; ältere Ausgleiche bleiben, wie sie sind.
+- Importierst du danach den Kartenauszug, wird die dort aufgeführte Zahlung als Duplikat übersprungen. Liegt die Gutschrift schon vor (Auszug vor der Abbuchung importiert), wird sie nur verknüpft.
+- Per PSD2 angebundene Karten liefern die Gutschrift selbst und lassen sich nicht verknüpfen. Für manuell geführte Girokonten gibt es weiter **Kartenausgleich** von Hand.
+
 ## Konfiguration
 
 Die Variablen für Enable Banking, Token-Verschlüsselung und Hintergrund-Abruf stehen in der [Konfiguration](configuration.md).
