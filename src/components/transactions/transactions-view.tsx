@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   deleteTransactionAction,
   batchUpdateTransactionsAction,
@@ -13,7 +13,7 @@ import {
   createCategoryRuleAction,
   applyCategoryRulesAction,
 } from "@/actions/category-rule-actions";
-import { saveRecentTransactionsSnapshot } from "@/lib/offline-queue";
+import { saveRecentTransactionsSnapshot, type CachedTransactionSnapshot } from "@/lib/offline-queue";
 import { BANK_TRANSACTION_DELETE_ERROR } from "@/lib/transaction-messages";
 import {
   formatCents,
@@ -93,11 +93,18 @@ function formatDateGroupHeader(dateStr: string): string {
 
 export function TransactionsView({
   transactions,
+  selectedMonth,
+  availableMonths,
+  recentTransactions,
   categories,
   presets,
   bankAccounts = [],
 }: {
+  /** Nur die Buchungen von `selectedMonth` (bzw. alle bei "all") */
   transactions: TransactionRow[];
+  selectedMonth: string;
+  availableMonths: string[];
+  recentTransactions: CachedTransactionSnapshot[];
   categories: (CategoryItem & { isArchived?: boolean })[];
   presets: VariablePresetItem[];
   bankAccounts?: Array<{
@@ -108,7 +115,17 @@ export function TransactionsView({
   }>;
 }) {
   const searchParams = useSearchParams();
-  const currentMonthPrefix = todayISO().slice(0, 7); // YYYY-MM (lokal)
+  const router = useRouter();
+  const pathname = usePathname();
+  const [monthChangePending, startMonthChange] = useTransition();
+
+  // Der Monat steht in der URL, damit der Server nur diesen Monat lädt
+  function changeMonth(month: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("quickAdd");
+    params.set("month", month);
+    startMonthChange(() => router.push(`${pathname}?${params.toString()}`));
+  }
 
   useEffect(() => {
     if (searchParams.get("quickAdd") === "1") {
@@ -116,24 +133,15 @@ export function TransactionsView({
     }
   }, [searchParams]);
 
-  // Lokalen IndexedDB-Snapshot der letzten Buchungen für die Offline-Ansicht aktualisieren
+  // Lokalen IndexedDB-Snapshot der letzten Buchungen für die Offline-Ansicht
+  // aktualisieren; unabhängig vom gewählten Monat immer die neuesten
   useEffect(() => {
-    if (transactions.length > 0) {
-      saveRecentTransactionsSnapshot(
-        transactions.slice(0, 15).map((t) => ({
-          id: t.id,
-          description: t.description,
-          amountCents: t.amountCents,
-          date: t.date,
-          type: t.type,
-          costType: t.costType,
-        }))
-      );
+    if (recentTransactions.length > 0) {
+      saveRecentTransactionsSnapshot(recentTransactions);
     }
-  }, [transactions]);
+  }, [recentTransactions]);
 
   const [search, setSearch] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthPrefix);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedCostType, setSelectedCostType] = useState<
     "all" | "variable" | "fixed"
@@ -361,23 +369,9 @@ export function TransactionsView({
     [categories]
   );
 
-  // Verfügbare Monate aus den Transaktionen ermitteln
-  const availableMonths = useMemo(() => {
-    const set = new Set<string>([currentMonthPrefix]);
-    for (const tx of transactions) {
-      if (tx.date && tx.date.length >= 7) {
-        set.add(tx.date.slice(0, 7));
-      }
-    }
-    return Array.from(set).sort().reverse();
-  }, [transactions, currentMonthPrefix]);
-
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       if (pendingDeleteIds.has(tx.id)) return false;
-      if (selectedMonth !== "all" && !tx.date.startsWith(selectedMonth)) {
-        return false;
-      }
       if (selectedCategory !== "all" && tx.categoryId !== selectedCategory) {
         return false;
       }
@@ -403,7 +397,6 @@ export function TransactionsView({
     });
   }, [
     transactions,
-    selectedMonth,
     selectedCategory,
     selectedCostType,
     selectedBankAccountId,
@@ -715,8 +708,11 @@ export function TransactionsView({
         >
           <select
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-2.5 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium"
+            onChange={(e) => changeMonth(e.target.value)}
+            disabled={monthChangePending}
+            aria-label="Monat"
+            aria-busy={monthChangePending}
+            className="px-2.5 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium disabled:opacity-60"
           >
             <option value="all">Alle Monate</option>
             {availableMonths.map((m) => (

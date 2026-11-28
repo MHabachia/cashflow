@@ -1,7 +1,6 @@
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import {
-  transactions,
   categories,
   variablePresets,
   bankAccounts,
@@ -9,9 +8,22 @@ import {
 } from "@/lib/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { TransactionsView } from "@/components/transactions/transactions-view";
+import { todayISO } from "@/lib/format";
+import {
+  listAvailableMonths,
+  loadRecentTransactions,
+  loadTransactionsForList,
+  parseListMonth,
+} from "@/lib/transactions-list";
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ month?: string | string[] }>;
+}) {
   const user = await requireUser();
+  const currentMonth = todayISO().slice(0, 7);
+  const selectedMonth = parseListMonth((await searchParams)?.month, currentMonth);
 
   const userCategories = db
     .select()
@@ -46,15 +58,13 @@ export default async function TransactionsPage() {
     userBankAccounts.map((a) => [a.id, a])
   );
 
-  const userTransactions = db
-    .select()
-    .from(transactions)
-    .where(eq(transactions.userId, user.id))
-    .orderBy(desc(transactions.date), desc(transactions.createdAt))
-    .all();
+  const userTransactions = loadTransactionsForList(user.id, selectedMonth);
 
   return (
     <TransactionsView
+      selectedMonth={selectedMonth}
+      availableMonths={listAvailableMonths(user.id, currentMonth)}
+      recentTransactions={loadRecentTransactions(user.id)}
       transactions={userTransactions.map((t) => ({
         id: t.id,
         categoryId: t.categoryId,
