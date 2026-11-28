@@ -7,6 +7,7 @@ import { publicErrorMessage } from "@/lib/errors";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { toLocalISODate } from "@/lib/format";
 
 const dbPath = path.resolve(process.env.DATABASE_PATH || "./data/app.db");
 
@@ -36,7 +37,7 @@ export async function GET() {
     }
 
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
+    const dateStr = toLocalISODate(now);
     const timeStr = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     const filename = `cashflow-backup-${dateStr}-${timeStr}.sqlite`;
 

@@ -84,12 +84,25 @@ export function formatDateDE(isoDate: string): string {
 /**
  * Gibt das heutige Datum als YYYY-MM-DD zurück
  */
-export function todayISO(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+/**
+ * Kalenderdatum (YYYY-MM-DD) in lokaler Zeit. Nicht `toISOString()`
+ * verwenden: Das liefert UTC, kurz nach Mitternacht (MEZ/MESZ) also das
+ * Datum des Vortags. Auf dem Server gilt die Zeitzone aus TZ.
+ */
+export function toLocalISODate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+export function todayISO(): string {
+  return toLocalISODate(new Date());
+}
+
+/** Lokales Kalenderdatum vor bzw. nach `days` Tagen (negativ = Vergangenheit). */
+export function shiftedLocalISODate(days: number, from: Date = new Date()): string {
+  return toLocalISODate(new Date(from.getFullYear(), from.getMonth(), from.getDate() + days));
 }
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {

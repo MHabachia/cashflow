@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { transactions, categories } from "@/lib/db/schema";
-import { escapeCsvField } from "@/lib/format";
+import { escapeCsvField, todayISO } from "@/lib/format";
 import { desc, eq, and, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
   });
 
   const csvContent = "\uFEFF" + [header, ...lines].join("\r\n");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const filename = yearParam ? `cashflow-export-${yearParam}.csv` : `cashflow-export-${today}.csv`;
 
   return new NextResponse(csvContent, {
