@@ -3,7 +3,8 @@ import { getCurrentSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { transactions, categories } from "@/lib/db/schema";
 import { escapeCsvField, todayISO } from "@/lib/format";
-import { desc, eq, and, sql } from "drizzle-orm";
+import { desc, eq, and, gte, lt } from "drizzle-orm";
+import { yearRange } from "@/lib/date-range";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ export async function GET(req: Request) {
 
   const queryConditions = [eq(transactions.userId, userId)];
   if (yearParam && /^\d{4}$/.test(yearParam)) {
-    queryConditions.push(sql`substr(${transactions.date}, 1, 4) = ${yearParam}`);
+    const range = yearRange(Number(yearParam));
+    queryConditions.push(gte(transactions.date, range.from), lt(transactions.date, range.to));
   }
 
   const rows = db
