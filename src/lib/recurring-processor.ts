@@ -5,42 +5,38 @@ import {
   type RecurringInterval,
 } from "@/lib/db/schema";
 import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
-import { RECURRING_MATCH_WINDOW_DAYS, shiftIsoDate } from "@/lib/recurring-matching";
+import { matchWindowDays, shiftIsoDate } from "@/lib/recurring-matching";
 import { todayISO } from "@/lib/format";
 import crypto from "node:crypto";
 
+const MONTHS_PER_INTERVAL: Record<Exclude<RecurringInterval, "weekly">, number> = {
+  monthly: 1,
+  quarterly: 3,
+  half_yearly: 6,
+  yearly: 12,
+};
+
+/**
+ * Nächste Fälligkeit nach `isoDate`. Bei monatlichen und längeren Intervallen
+ * wird zuerst der Zielmonat bestimmt und dann der Wunschtag auf dessen Länge
+ * begrenzt (31.01. → 28./29.02. → 31.03.). Früher lief `setMonth` über das
+ * Monatsende hinaus und übersprang kurze Monate (31.01. → 03.03. → 31.03.).
+ */
 export function addIntervalToDate(
   isoDate: string,
   interval: RecurringInterval,
   preferredDayOfMonth: number
 ): string {
   const [y, m, d] = isoDate.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
+  let date: Date;
 
-  switch (interval) {
-    case "weekly":
-      date.setDate(date.getDate() + 7);
-      break;
-    case "monthly":
-      date.setMonth(date.getMonth() + 1);
-      break;
-    case "quarterly":
-      date.setMonth(date.getMonth() + 3);
-      break;
-    case "half_yearly":
-      date.setMonth(date.getMonth() + 6);
-      break;
-    case "yearly":
-      date.setFullYear(date.getFullYear() + 1);
-      break;
-  }
-
-  // Bei monatlichen/quartalsweisen/jährlichen Intervallen den gewünschten Tag im Monat einhalten (z.B. 1. oder 15.)
-  if (interval !== "weekly" && preferredDayOfMonth >= 1) {
-    const targetYear = date.getFullYear();
-    const targetMonth = date.getMonth();
-    const maxDaysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-    date.setDate(Math.min(preferredDayOfMonth, maxDaysInMonth));
+  if (interval === "weekly") {
+    date = new Date(y, m - 1, d + 7);
+  } else {
+    date = new Date(y, m - 1 + MONTHS_PER_INTERVAL[interval], 1);
+    const wantedDay = preferredDayOfMonth >= 1 ? preferredDayOfMonth : d;
+    const daysInTargetMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    date.setDate(Math.min(wantedDay, daysInTargetMonth));
   }
 
   const ny = date.getFullYear();
@@ -110,8 +106,8 @@ export function processDueRecurringExpenses(userId: string): number {
                 and(
                   eq(transactions.recurringId, item.id),
                   isNotNull(transactions.bankTransactionId),
-                  gte(transactions.date, shiftIsoDate(currentDue, -RECURRING_MATCH_WINDOW_DAYS)),
-                  lte(transactions.date, shiftIsoDate(currentDue, RECURRING_MATCH_WINDOW_DAYS))
+                  gte(transactions.date, shiftIsoDate(currentDue, -matchWindowDays(item.interval))),
+                  lte(transactions.date, shiftIsoDate(currentDue, matchWindowDays(item.interval)))
                 )
               )
               .get();
