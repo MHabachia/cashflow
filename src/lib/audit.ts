@@ -35,6 +35,7 @@ export type AuditAction =
   | "admin.backup.restore_staged"
   | "bank.connect"
   | "bank.disconnect"
+  | "bank.revoke"
   | "bank.consent_expired";
 
 export interface AuditEntryInput {

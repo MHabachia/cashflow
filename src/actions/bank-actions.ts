@@ -12,10 +12,12 @@ import {
 import { requireUser } from "@/lib/session";
 import { publicErrorMessage } from "@/lib/errors";
 import { logAudit } from "@/lib/audit";
-import { encryptBankToken } from "@/lib/crypto/vault";
+import { decryptBankToken, encryptBankToken } from "@/lib/crypto/vault";
 import { POPULAR_BANK_INSTITUTIONS } from "@/lib/bank-institutions";
 import {
   BANK_SYNC_NOT_CONFIGURED_ERROR,
+  BankApiError,
+  getBankSyncProvider,
   isLiveBankingMode,
   isMockBankingAllowed,
 } from "@/lib/bank-sync/provider";
@@ -143,10 +145,56 @@ function safeRevalidatePath(path: string) {
   }
 }
 
+/**
+ * Beendet die Session beim Anbieter, bevor die lokalen Daten gelöscht werden.
+ * Scheitert das, wird trotzdem getrennt: Der Nutzer soll sich auch bei
+ * ausgefallener Bank-API lösen können; die Zustimmung läuft dann spätestens
+ * zum gespeicherten Ablaufdatum aus.
+ */
+async function revokeBankSession(
+  userId: string,
+  bank: { id: string; encryptedAccessToken: string }
+): Promise<boolean> {
+  try {
+    const accessToken = decryptBankToken(bank.encryptedAccessToken, userId);
+    await getBankSyncProvider().revokeSession(accessToken);
+    logAudit({ action: "bank.revoke", userId, target: bank.id, details: { ok: true } });
+    return true;
+  } catch (err: unknown) {
+    const status = err instanceof BankApiError ? err.status : null;
+    console.warn("[BankDisconnect] Session konnte beim Anbieter nicht beendet werden", {
+      connectedBankId: bank.id,
+      status,
+      error: err instanceof Error ? err.name : "unknown",
+    });
+    logAudit({ action: "bank.revoke", userId, target: bank.id, details: { ok: false, status } });
+    return false;
+  }
+}
+
 export async function disconnectBankAction(connectedBankId: string) {
   try {
     const user = await requireUser();
     logAudit({ action: "bank.disconnect", userId: user.id, target: connectedBankId });
+
+    // 0. Session beim Anbieter beenden (nur echte PSD2-Verbindungen des Nutzers)
+    let revocationFailed = false;
+    let consentExpiresAt: string | null = null;
+    if (connectedBankId !== "manual_banks_group") {
+      const bank = db
+        .select({
+          id: connectedBanks.id,
+          encryptedAccessToken: connectedBanks.encryptedAccessToken,
+          consentExpiresAt: connectedBanks.consentExpiresAt,
+        })
+        .from(connectedBanks)
+        .where(and(eq(connectedBanks.id, connectedBankId), eq(connectedBanks.userId, user.id)))
+        .get();
+      if (bank) {
+        revocationFailed = !(await revokeBankSession(user.id, bank));
+        consentExpiresAt = bank.consentExpiresAt;
+      }
+    }
 
     // 1. Alle zugehörigen Konten ermitteln (für PSD2 oder manuelle Gruppe)
     const accounts =
@@ -209,7 +257,7 @@ export async function disconnectBankAction(connectedBankId: string) {
     safeRevalidatePath("/banking");
     safeRevalidatePath("/transactions");
     safeRevalidatePath("/");
-    return { success: true };
+    return { success: true, revocationFailed, consentExpiresAt: revocationFailed ? consentExpiresAt : null };
   } catch (err: unknown) {
     return {
       success: false,

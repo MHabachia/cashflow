@@ -22,6 +22,12 @@ Cashflow kann Bankbuchungen und Kreditkartenumsätze über PSD2 (Enable Banking)
 4. Nach erfolgreicher Freigabe leitet die Bank zurück auf Cashflow (`/api/bank-sync/callback`). Die Konten und Karten werden angelegt.
 5. Über **„Alle synchronisieren“** oder den Sync-Button am jeweiligen Konto werden neue Umsätze abgerufen, idempotent dedupliziert und automatisch bestehenden Fixkosten-Verträgen (Miete, Strom, Abos) bzw. Kategorien zugeordnet.
 
+## Bank trennen
+
+**Trennen** auf der Bankkarte entfernt die Bankverbindung und ihre Konten; die Buchungen bleiben als manuelle Buchungen erhalten. Vorher beendet die App die Session bei Enable Banking (`DELETE /sessions/{id}`). Laut Enable Banking wird damit auch die Zustimmung bei der Bank beendet, soweit die Bank das unterstützt.
+
+Ist Enable Banking nicht erreichbar, wird trotzdem getrennt. Die App weist dann darauf hin, dass die Freigabe bei der Bank bis zu ihrem Ablaufdatum weiterläuft; sie lässt sich auch im Online-Banking widerrufen.
+
 ## Umbuchungen und manuelle Zuordnung
 
 Nach jedem Abruf und Import sucht die App Umbuchungen zwischen deinen Konten: Eine Abbuchung und eine Gutschrift über denselben Betrag auf zwei verschiedenen Konten im Abstand von höchstens 3 Tagen werden als **Umbuchung & Ausgleich** markiert und zählen nicht als Ausgabe.
