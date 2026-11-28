@@ -14,6 +14,7 @@ import { publicErrorMessage } from "@/lib/errors";
 import { userOwnsAllCategories, userOwnsCategory } from "@/lib/ownership";
 import { BANK_TRANSACTION_DELETE_ERROR } from "@/lib/transaction-messages";
 import { firstIssueMessage, idListSchema, idSchema } from "@/lib/validation";
+import { findDuplicateGroups } from "@/lib/duplicate-detection";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -485,25 +486,10 @@ export async function batchDeleteTransactionsAction(rawIds: string[]) {
   }
 }
 
-export interface DuplicateGroupItem {
-  id: string;
-  date: string;
-  description: string;
-  amountCents: number;
-  type: "expense" | "income";
-  bankAccountName?: string | null;
-  bankTransactionId?: string | null;
-  categoryId?: string;
-}
-
-export interface DuplicateGroup {
-  groupId: string;
-  amountCents: number;
-  items: DuplicateGroupItem[];
-}
+export type { DuplicateGroup, DuplicateGroupItem } from "@/lib/duplicate-detection";
 
 /**
- * Findet potenzielle Duplikate (gleicher Betrag, gleicher Typ, Datum innerhalb von 2 Tagen und ähnlicher Text).
+ * Findet potenzielle Duplikate (gleicher Betrag, gleicher Typ, Datum höchstens 3 Tage auseinander und ähnlicher Text).
  */
 export async function findDuplicateTransactionsAction() {
   try {
@@ -532,74 +518,7 @@ export async function findDuplicateTransactionsAction() {
       .all();
     const accMap = new Map(accounts.map((a) => [a.id, a.name]));
 
-    const duplicateGroups: DuplicateGroup[] = [];
-    const usedIds = new Set<string>();
-
-    for (let i = 0; i < userTx.length; i++) {
-      const a = userTx[i];
-      if (usedIds.has(a.id)) continue;
-
-      const groupMatches: DuplicateGroupItem[] = [];
-
-      for (let j = i + 1; j < userTx.length; j++) {
-        const b = userTx[j];
-        if (usedIds.has(b.id)) continue;
-
-        // Gleicher Betrag und gleicher Typ
-        if (a.amountCents === b.amountCents && a.type === b.type) {
-          // Datumsdifferenz maximal 3 Tage (z. B. Kartenzahlung Samstag, Verbuchung Dienstag)
-          const timeA = new Date(a.date).getTime();
-          const timeB = new Date(b.date).getTime();
-          const dayDiff = Math.abs(timeA - timeB) / (1000 * 60 * 60 * 24);
-
-          if (dayDiff <= 3) {
-            // Text-Ähnlichkeit prüfen
-            const normA = a.description.toLowerCase().replace(/[^a-z0-9]/g, "");
-            const normB = b.description.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-            const textMatch =
-              normA === normB ||
-              normA.includes(normB.slice(0, 6)) ||
-              normB.includes(normA.slice(0, 6));
-
-            if (textMatch) {
-              groupMatches.push({
-                id: b.id,
-                date: b.date,
-                description: b.description,
-                amountCents: b.amountCents,
-                type: b.type as "expense" | "income",
-                bankAccountName: b.bankAccountId ? accMap.get(b.bankAccountId) || "Konto" : "Manuell",
-                bankTransactionId: b.bankTransactionId,
-                categoryId: b.categoryId,
-              });
-              usedIds.add(b.id);
-            }
-          }
-        }
-      }
-
-      if (groupMatches.length > 0) {
-        usedIds.add(a.id);
-        duplicateGroups.push({
-          groupId: `dup_${a.id}`,
-          amountCents: a.amountCents,
-          items: [
-            {
-              id: a.id,
-              date: a.date,
-              description: a.description,
-              amountCents: a.amountCents,
-              type: a.type as "expense" | "income",
-              bankAccountName: a.bankAccountId ? accMap.get(a.bankAccountId) || "Konto" : "Manuell",
-              bankTransactionId: a.bankTransactionId,
-              categoryId: a.categoryId,
-            },
-            ...groupMatches,
-          ],
-        });
-      }
-    }
+    const duplicateGroups = findDuplicateGroups(userTx, accMap);
 
     return {
       success: true,
